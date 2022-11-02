@@ -15,3 +15,6 @@ The data are in the Data folder and include:</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(1) Input files</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(2) Output folder - Output files for general</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(3) Cancer type folder - Output files for cancer types
+
+Contact information:</br>
+    &nbsp;&nbsp;&nbsp;&nbsp;If there are any issues with the method we encourage you to post on the issues section of this github page. If you are unable to do so please get in touch with Vu Viet Hoang Pham (vpham@ccia.org.au).
