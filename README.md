@@ -14,4 +14,4 @@ The scripts are in the Script folder and include:</br>
 The data are in the Data folder and include:</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(1) Input files</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(2) Output folder - Output files for general</br>
-    &nbsp;&nbsp;&nbsp;&nbsp;(2) Cancer type folder - Output files for cancer types
+    &nbsp;&nbsp;&nbsp;&nbsp;(3) Cancer type folder - Output files for cancer types
