@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#PBS -l select=1:ncpus=4:mem=40gb
+#PBS -l walltime=8:00:00
+#PBS -M vu.v.pham@unsw.edu.au
+#PBS -m ae
+#PBS -j oe
+#PBS -o /srv/scratch/z3538133/002NetworkAnalysis/Data/SKCM
+
+ln -s /srv/scratch/z3538133/001pancancer/pan/data/SKCM/TCGA_DEG_list.Rdata /srv/scratch/z3538133/002NetworkAnalysis/Data/SKCM/TCGA_DEG_list.Rdata
+ln -s /srv/scratch/z3538133/001pancancer/pan/data/SKCM/DEG_limmavoom.Rdata /srv/scratch/z3538133/002NetworkAnalysis/Data/SKCM/DEG_limmavoom.Rdata
+cancertype="SKCM"
+ln -s /srv/scratch/z3538133/001pancancer/pan/data/$cancertype/gtex.$cancertype.meta.RData /srv/scratch/z3538133/002NetworkAnalysis/Data/$cancertype/gtex.$cancertype.meta.RData
+
+export WORKDIR=/srv/scratch/z3538133/002NetworkAnalysis/Data/SKCM
+cd $WORKDIR
+
+#Load module(s) if required
+# module load R/4.0.2
+module load gcc/7.5.0
+module load R/4.0.2-gcc7
+module unload gcc/7.5.0
+module load gcc/8.4.0
+
+rootDir="/srv/scratch/z3538133/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+outDir="/srv/scratch/z3538133/002NetworkAnalysis/Data/SKCM"
+controlDir="/srv/scratch/z3538133/002NetworkAnalysis/control"
+cancertype="SKCM"
+primarySite=""
+bodySite=""
+
+echo "Running"
+Rscript --verbose /srv/scratch/z3538133/002NetworkAnalysis/Script/Smain.R --rootDir=${rootDir} --outDir=${outDir} --controlDir=${controlDir} --cancertype=${cancertype} --primarySite=${primarySite} --bodySite=${bodySite} > Smain.Rout
+Rscript --verbose /srv/scratch/z3538133/002NetworkAnalysis/Script/main02.R --rootDir=${rootDir} --outDir=${outDir} --controlDir=${controlDir} --cancertype=${cancertype} --primarySite=${primarySite} --bodySite=${bodySite} > main02.Rout
+
+### Run
+### qsub /srv/scratch/z3538133/002NetworkAnalysis/Script/SSKCM.txt
