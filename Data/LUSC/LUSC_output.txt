@@ -1,0 +1,24 @@
+Starting
+limma
+13180 genes' expression changed
+Number of nodes
+6310 nodes
+Number of edges
+89298 edges
+Number of critical nodes
+549 nodes
+In copper gene list
+8 genes
+GSK3B
+CYP1A1
+MAP1LC3A
+JUN
+IL1A
+SPATA5
+SORD
+TP53
+Univariate Cox analysis
+3 genes
+MAP1LC3A
+JUN
+SPATA5
