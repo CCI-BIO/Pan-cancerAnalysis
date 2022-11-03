@@ -1,0 +1,22 @@
+Starting
+limma
+10270 genes' expression changed
+Number of nodes
+5808 nodes
+Number of edges
+53598 edges
+Number of critical nodes
+522 nodes
+In copper gene list
+7 genes
+ALB
+BACE1
+CASP3
+AP1B1
+CDK1
+TMPRSS6
+FOXO1
+Univariate Cox analysis
+2 genes
+BACE1
+CDK1
