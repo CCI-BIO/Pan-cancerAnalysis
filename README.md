@@ -1,4 +1,4 @@
-<b>Pan-cancer analysis of genes involved in cuproplasia</b>
+<b>Pan-cancer analysis of genes and signatures involved in cuproplasia</b>
 
 This repository includes the scripts and data of the proposed method.
 
