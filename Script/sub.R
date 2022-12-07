@@ -33,6 +33,11 @@ library(heatmaply)
 library(forcats)
 library(ezcox)
 library(glmnet)
+library(RTCGAToolbox)
+library(reticulate)
+require(data.table)
+library("biomaRt")
+library(EnsDb.Hsapiens.v79)
 
 #---------------------------------------
 # Set environment variables if any
@@ -200,7 +205,7 @@ subtypes
 
 n <- length(subtypes)
 t <- matrix(NA, nrow = n, ncol = 3)
-colnames(t) <- c('Cancer type', 'Number of CCGs', 'Critical copper genes')
+colnames(t) <- c('Cancer type', 'Number of CCGs', 'Critical cuproplasia-related genes (CCGs)')
 for (i in 1:n) {
   cancertype <- subtypes[i]
   outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
@@ -267,27 +272,27 @@ rownames(criticalCopperGenes)
 nr # number of critical copper genes
 nc # number of cancer types
 # > rownames(criticalCopperGenes)
-# [1] "CDK1"     "COX17"    "DBH"      "SLC11A2"  "MAP1LC3A" "ALB"      "ANG"      "ANKRD9"   "AP1S1"    "ARF1"     "APC"      "TMPRSS6"  "GPC1"     "LOXL1"    "ATOX1"    "MAPT"    
-# [17] "CASP3"    "XIAP"     "GSK3B"    "AOC3"     "S100A12"  "FOXO1"    "JUN"      "SNCA"     "SORD"     "APP"      "PRNP"     "ATP6AP1"  "F5"       "ADAM10"   "ADAM17"   "MT-CO2"  
-# [33] "STEAP3"   "CYP1A1"   "CP"       "MMGT1"    "BACE1"    "AP1B1"    "TP53"     "ATP7A"    "SP1"      "CCND1"    "MT-CO1"   "PRND"     "AANAT"    "AQP1"     "MT1X"     "IL1A"    
-# [49] "SPATA5"   "COMMD1"   "F8"       "SUMF1"    "XAF1"     "HEPH"     "PARK7"    "LCAT"    
+# [1] "CDK1"     "COX17"    "DBH"      "SLC11A2"  "MAP1LC3A" "ALB"
+# [7] "ANG"      "ANKRD9"   "AP1S1"    "ARF1"     "APC"      "TMPRSS6"
+# [13] "GPC1"     "LOXL1"    "ATOX1"    "MAPT"     "CASP3"    "XIAP"
+# [19] "GSK3B"    "AOC3"     "S100A12"  "FOXO1"    "JUN"      "SNCA"
+# [25] "SORD"     "APP"      "PRNP"     "ATP6AP1"  "F5"       "ADAM10"
+# [31] "ADAM17"   "COA6"     "MT-CO2"   "STEAP3"   "CYP1A1"   "CP"
+# [37] "MMGT1"    "BACE1"    "AP1B1"    "TP53"     "ATP7A"    "SP1"
+# [43] "CCND1"    "MT-CO1"   "PRND"     "AANAT"    "AQP1"     "MT1X"
+# [49] "IL1A"     "SPATA5"   "COMMD1"   "F8"       "SUMF1"    "XAF1"
+# [55] "HEPH"     "PARK7"    "LCAT"
 # > nr # number of critical copper genes
-# [1] 56
+# [1] 57
 # > nc # number of cancer types
 # [1] 23
 
 x <- criticalCopperGenes
 x$frequency <- rowSums(criticalCopperGenes)
 x <- x[order(x$frequency, decreasing = TRUE),]
-# > row.names(x)
-# [1] "CDK1"     "ALB"      "AP1S1"    "CASP3"    "MAP1LC3A" "SNCA"     "TMPRSS6"  "MAPT"     "GSK3B"    "JUN"      "APP"      "CYP1A1"   "COX17"    "XIAP"     "TP53"     "FOXO1"   
-# [17] "ARF1"     "GPC1"     "AOC3"     "SORD"     "PRNP"     "F5"       "ATP7A"    "SP1"      "MT-CO1"   "DBH"      "SLC11A2"  "ANG"      "S100A12"  "ATP6AP1"  "ADAM10"   "MT-CO2"  
-# [33] "CP"       "BACE1"    "PRND"     "AQP1"     "MT1X"     "IL1A"     "XAF1"     "ANKRD9"   "APC"      "LOXL1"    "ATOX1"    "ADAM17"   "STEAP3"   "MMGT1"    "AP1B1"    "CCND1"   
-# [49] "AANAT"    "SPATA5"   "COMMD1"   "F8"       "SUMF1"    "HEPH"     "PARK7"    "LCAT"   
 
 print(paste(row.names(x), collapse=", "))
-# > print(paste(row.names(x), collapse=", "))
-# [1] "CDK1, ALB, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, TP53, FOXO1, ARF1, GPC1, AOC3, SORD, PRNP, F5, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, BACE1, PRND, AQP1, MT1X, IL1A, XAF1, ANKRD9, APC, LOXL1, ATOX1, ADAM17, STEAP3, MMGT1, AP1B1, CCND1, AANAT, SPATA5, COMMD1, F8, SUMF1, HEPH, PARK7, LCAT"
+# [1] "CDK1, ALB, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, TP53, FOXO1, COA6, ARF1, GPC1, AOC3, SORD, PRNP, F5, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, BACE1, PRND, AQP1, MT1X, IL1A, XAF1, ANKRD9, APC, LOXL1, ATOX1, ADAM17, STEAP3, MMGT1, AP1B1, CCND1, AANAT, SPATA5, COMMD1, F8, SUMF1, HEPH, PARK7, LCAT"
 
 important.copper.genelist <- c('SLC31A1', 'MT2A', 'ATP7A', 'ATP7B', 'MT1X', 'ATOX1', 'COX17', 'MTH1', 'SOD1', 'GSS')
 intersect(important.copper.genelist, row.names(x))
@@ -299,9 +304,9 @@ selectedCriticalCopperGenes <- x[which(x$frequency > 1),]
 print(paste(row.names(selectedCriticalCopperGenes), collapse=", "))
 nrow(selectedCriticalCopperGenes)
 # > print(paste(row.names(selectedCriticalCopperGenes), collapse=", "))
-# [1] "CDK1, ALB, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, TP53, FOXO1, ARF1, GPC1, AOC3, SORD, PRNP, F5, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, BACE1, PRND, AQP1, MT1X, IL1A, XAF1"
+# [1] "CDK1, ALB, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, TP53, FOXO1, COA6, ARF1, GPC1, AOC3, SORD, PRNP, F5, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, BACE1, PRND, AQP1, MT1X, IL1A, XAF1"
 # > nrow(selectedCriticalCopperGenes)
-# [1] 39
+# [1] 40
 
 # Get gene activities
 x$gene <- row.names(x)
@@ -620,11 +625,76 @@ dev.off()
 # (6) Pathway
 # Local
 #================================================================
+
+rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+# Set working directory
+setwd(rootDir)
+# Include the script of functions
+source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
+
 # Enrichment analysis
 outDir <- paste(rootDir, "/Data/Output", sep = "")
 fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
 selectedCriticalCopperGenes <- read.csv(fileName)
 cat(selectedCriticalCopperGenes$gene, sep = '\n')
+# > cat(selectedCriticalCopperGenes$gene, sep = '\n')
+# CDK1
+# ALB
+# AP1S1
+# CASP3
+# MAP1LC3A
+# SNCA
+# TMPRSS6
+# MAPT
+# GSK3B
+# JUN
+# APP
+# CYP1A1
+# COX17
+# XIAP
+# TP53
+# FOXO1
+# COA6
+# ARF1
+# GPC1
+# AOC3
+# SORD
+# PRNP
+# F5
+# ATP7A
+# SP1
+# MT-CO1
+# DBH
+# SLC11A2
+# ANG
+# S100A12
+# ATP6AP1
+# ADAM10
+# MT-CO2
+# CP
+# BACE1
+# PRND
+# AQP1
+# MT1X
+# IL1A
+# XAF1
+# ANKRD9
+# APC
+# LOXL1
+# ATOX1
+# ADAM17
+# STEAP3
+# MMGT1
+# AP1B1
+# CCND1
+# AANAT
+# SPATA5
+# COMMD1
+# F8
+# SUMF1
+# HEPH
+# PARK7
+# LCAT
 
 # Biological process
 GO_process <- read.table(paste(outDir, "/Enrich/GO_Biological_Process_2021_table.txt", sep=""),
@@ -694,7 +764,7 @@ GO_process <- GO_process[, c(1,2,4,9)]
 colnames(GO_process) <- c("Term", "Overlap", "Adjusted p-value", "Genes")
 GO_process <- GO_process[which(GO_process[,3] < 0.05),]
 GO_process <- GO_process[order(GO_process[,3], decreasing = FALSE),]
-write.csv(GO_process, file = paste(outDir, "/Enrich/KEGG_2021_Human_table.csv",
+write.csv(GO_process, file = paste(outDir, "/Enrich/KEGG_2021_Human_table_Cutoff.csv",
                                    sep=""), row.names = FALSE, quote=TRUE)
 r <- prepareDataForClustergram(GO_process, termTop = top, geneTop  = 0)
 rr <- t(r)
@@ -747,13 +817,13 @@ print(latex.table.by(GO_process[1:20,], digits = c(0,0,0,-3,0)), include.rowname
 
 # Reactome
 top <- 20
-GO_process <- read.table(paste(outDir, "/Enrich/Reactome_2016_table.txt", sep=""),
+GO_process <- read.table(paste(outDir, "/Enrich/Reactome_2022_table.txt", sep=""),
                          as.is = TRUE, sep = "\t", header = TRUE, quote="")
 GO_process <- GO_process[, c(1,2,4,9)]
 colnames(GO_process) <- c("Term", "Overlap", "Adjusted p-value", "Genes")
 GO_process <- GO_process[which(GO_process[,3] < 0.05),]
 GO_process <- GO_process[order(GO_process[,3], decreasing = FALSE),]
-write.csv(GO_process, file = paste(outDir, "/Enrich/Reactome_2016_table.csv",
+write.csv(GO_process, file = paste(outDir, "/Enrich/Reactome_2022_table_Cutoff.csv",
                                    sep=""), row.names = FALSE, quote=TRUE)
 r <- prepareDataForClustergram(GO_process, termTop = top, geneTop  = 0)
 rr <- t(r)
@@ -762,13 +832,13 @@ colnames(rr) <- rr[1,]
 rr <- rr[-1,]
 colnames(rr)[1] <- "Term"
 rr[1:top,1] <- GO_process$Term[1:top]
-write.csv(rr, file = paste(outDir, "/Enrich/Reactome_2016_table.csv",
+write.csv(rr, file = paste(outDir, "/Enrich/Reactome_2022_table.csv",
                            sep=""), row.names = FALSE, quote=TRUE)
 
 # Output
 # Image
-dat <- read.csv(file = paste(outDir, "/Enrich/Reactome_2016_table.csv", sep=""))
-f <- paste(outDir, "/Enrich/Reactome_2016_table.pdf", sep = "")
+dat <- read.csv(file = paste(outDir, "/Enrich/Reactome_2022_table.csv", sep=""))
+f <- paste(outDir, "/Enrich/Reactome_2022_table.pdf", sep = "")
 pdf(file = f,  width = 12, height = 8, onefile=FALSE)
 dat$Term
 # > dat$Term
@@ -833,7 +903,7 @@ n
 # 4    CASP3         9   0   0    0    1
 # 5 MAP1LC3A         8   0   1    0    1
 # > n
-# [1] 56
+# [1] 57
 
 r <- criticalCopperGenes[,-ncol(criticalCopperGenes)] # remove summary
 
@@ -902,9 +972,9 @@ print(paste(r[which(r$numUp < r$numDown),"gene"], collapse=", "))
 print(paste("Other critical copper genes: ", nrow(r[which(r$numUp == r$numDown),]), sep = ""))
 print(paste(r[which(r$numUp == r$numDown),"gene"], collapse=", "))
 # > print(paste("Up critical copper genes: ", nrow(r[which(r$numUp > r$numDown),]), sep = ""))
-# [1] "Up critical copper genes: 31"
+# [1] "Up critical copper genes: 32"
 # > print(paste(r[which(r$numUp > r$numDown),"gene"], collapse=", "))
-# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, TP53, ARF1, GPC1, SORD, F5, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP, APC, ATOX1, ADAM17, STEAP3, MMGT1, AP1B1, CCND1, SPATA5, COMMD1, SUMF1, PARK7"
+# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, TP53, COA6, ARF1, GPC1, SORD, F5, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP, APC, ATOX1, ADAM17, STEAP3, MMGT1, AP1B1, CCND1, SPATA5, COMMD1, SUMF1, PARK7"
 # > print(paste("Down critical copper genes: ", nrow(r[which(r$numUp < r$numDown),]), sep = ""))
 # [1] "Down critical copper genes: 19"
 # > print(paste(r[which(r$numUp < r$numDown),"gene"], collapse=", "))
@@ -924,11 +994,10 @@ print(paste("Down critical copper genes: ", nrow(r[which(r$numUp < r$numDown),])
 print(paste(r[which(r$numUp < r$numDown),"gene"], collapse=", "))
 print(paste("Other critical copper genes: ", nrow(r[which(r$numUp == r$numDown),]), sep = ""))
 print(paste(r[which(r$numUp == r$numDown),"gene"], collapse=", "))
-# > r <- r[which(r$frequency > 1),]
 # > print(paste("Up critical copper genes: ", nrow(r[which(r$numUp > r$numDown),]), sep = ""))
-# [1] "Up critical copper genes: 20"
+# [1] "Up critical copper genes: 21"
 # > print(paste(r[which(r$numUp > r$numDown),"gene"], collapse=", "))
-# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, TP53, ARF1, GPC1, SORD, F5, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP"
+# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, TP53, COA6, ARF1, GPC1, SORD, F5, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP"
 # > print(paste("Down critical copper genes: ", nrow(r[which(r$numUp < r$numDown),]), sep = ""))
 # [1] "Down critical copper genes: 13"
 # > print(paste(r[which(r$numUp < r$numDown),"gene"], collapse=", "))
@@ -1134,7 +1203,7 @@ outDir <- paste(rootDir, "/Data/Output", sep = "")
 fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
 x <- read.csv(fileName)
 geneList <- x$gene
-surdata <- obtainSurData(geneList) # save in surdata.Rdata for 56 critical copper genes
+surdata <- obtainSurData(geneList) # save in surdata.Rdata for 57 critical copper genes
 surdata[1:5,1:4]
 nrow(surdata)
 ncol(surdata)
@@ -1148,7 +1217,7 @@ ncol(surdata)
 # > nrow(surdata)
 # [1] 6727
 # > ncol(surdata)
-# [1] 59
+# [1] 60
 
 table(surdata$cancertype)
 # > table(surdata$cancertype)
@@ -1367,7 +1436,7 @@ n
 # 4    CASP3         9   0   0    0    1
 # 5 MAP1LC3A         8   0   1    0    1
 # > n
-# [1] 56
+# [1] 57
 
 r <- criticalCopperGenes[,-ncol(criticalCopperGenes)] # remove summary
 r[,3:(ncol(criticalCopperGenes)-1)] <- 2
@@ -1407,6 +1476,7 @@ head(r)
 # 4 2.000 2.0000 2.000 0.526 2.000
 # 5 0.634 2.0000 0.147 2.000 2.000
 # 6 0.674 2.0000 2.000 0.703 2.000
+
 rr <- r
 rr$Total <- rowSums(r[,-c(1,2)] < 2)
 rr$NumSig <- rowSums(r[,-c(1,2)] <= 0.05)
@@ -1421,7 +1491,10 @@ write.csv(rr, paste(outDir, '/pCox.csv', sep = ""), row.names = FALSE)
 
 # Draw the chart
 dat <- read.csv(paste(outDir, '/pCox.csv', sep = ""))
-dat <- dat[1:10,]
+#dat <- dat[1:10,]
+# Get only genes which are significant in at least one cancer type
+dat <- dat[which(dat$NumSig > 0),]
+
 rownames(dat) <- dat$gene
 n <- ncol(dat)
 dat <- dat[,-c(1,2,n-1,n)]
@@ -1472,7 +1545,7 @@ labels_x <- levels(tmp3$x)
 breaks_x <- seq_along(labels_x)
 
 outFile <- paste(outDir, "/uniCox.pdf", sep = "")
-pdf(file = outFile,  width = 9, height = 3, onefile=FALSE)
+pdf(file = outFile,  width = 9, height = 6, onefile=FALSE)
 Note <- c("pvalue < 0.05")
 ggplot(tmp3, aes(x=x1, y=y1))+
   geom_tile(aes(fill=pvalue), color="white", size=0.25) + 
@@ -1508,7 +1581,7 @@ ncol(surdata)
 # > nrow(surdata)
 # [1] 6727
 # > ncol(surdata)
-# [1] 59
+# [1] 60
 
 outDir <- paste(rootDir, "/Data/Output", sep = "")
 fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
@@ -1530,7 +1603,7 @@ colnames(y)
 # 4    CASP3         9   0   0
 # 5 MAP1LC3A         8   0   1
 # > nrow(x)
-# [1] 56
+# [1] 57
 # > ncol(x)
 # [1] 26
 # > y[1:5,1:4]
@@ -1541,7 +1614,7 @@ colnames(y)
 # 4    CASP3         9   0    0
 # 5 MAP1LC3A         8   0 DOWN
 # > nrow(y)
-# [1] 56
+# [1] 57
 # > ncol(y)
 # [1] 27
 # > colnames(y)
@@ -1551,26 +1624,26 @@ colnames(y)
 # [19] "PCPG"      "PRAD"      "SKCM"      "STAD"      "THCA"      "UCEC"
 # [25] "UCS"       "numUp"     "numDown"
 
-# All 56 critical copper genes
-geneList56 <- x$gene
-f56 <- paste(outDir, "/uni56.csv", sep = "")
+# All 57 critical copper genes
+geneList57 <- x$gene
+f57 <- paste(outDir, "/uni57.csv", sep = "")
 
-# 31 up critical copper genes
-geneList31 <- y[which(y$numUp > y$numDown),]$gene
-f31 <- paste(outDir, "/uni31.csv", sep = "")
+# 32 up critical copper genes
+geneList32 <- y[which(y$numUp > y$numDown),]$gene
+f32 <- paste(outDir, "/uni32.csv", sep = "")
 
 # 19 down critical copper genes
 geneList19 <- y[which(y$numUp < y$numDown),]$gene
 f19 <- paste(outDir, "/uni19.csv", sep = "")
 
-# 39 popular critical cooper genes
-geneList39 <- x[which(x$frequency > 1),]$gene
-f39 <- paste(outDir, "/uni39.csv", sep = "")
+# 40 popular critical cooper genes
+geneList40 <- x[which(x$frequency > 1),]$gene
+f40 <- paste(outDir, "/uni40.csv", sep = "")
 
-# 20 up critical copper genes (more than 1 cancer type)
+# 21 up critical copper genes (more than 1 cancer type)
 y <- y[which(y$frequency > 1),]
-geneList20 <- y[which(y$numUp > y$numDown),]$gene
-f20 <- paste(outDir, "/uni20.csv", sep = "")
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+f21 <- paste(outDir, "/uni21.csv", sep = "")
 
 # 13 down critical copper genes (more than 1 cancer type)
 y <- y[which(y$frequency > 1),]
@@ -1581,8 +1654,8 @@ f13 <- paste(outDir, "/uni13.csv", sep = "")
 
 # A. First select copper genes from critical list
 
-# geneList39
-# geneList20
+# geneList40
+# geneList21
 # geneList13
 
 # B. Prepare PAN.log2.counts dataframe
@@ -1611,18 +1684,18 @@ ncol(coxdata)
 # > nrow(coxdata)
 # [1] 6727
 # > ncol(coxdata)
-# [1] 59
+# [1] 60
 
 # to check distibution of gene expression (Optional) - they should have a normal distribution
 # check gene MT1X
 #ggplot(coxdata, aes(x = MT1X)) + geom_histogram(color = "black", fill = "white") 
 
-res_mod = ezcox(coxdata, time = "OS.time", status = "OS", covariates = geneList39, global_method = c("likelihood", "wald", "logrank"), return_models = TRUE) # for TCGA test data
+res_mod = ezcox(coxdata, time = "OS.time", status = "OS", covariates = geneList40, global_method = c("likelihood", "wald", "logrank"), return_models = TRUE) # for TCGA test data
 mds = get_models(res_mod)
 str(mds, max.level = 1)
 show_models(mds)
 
-cox_res <- ezcox(coxdata, time = "OS.time", status = "OS", covariates = geneList39, global_method = c("likelihood", "wald", "logrank"))
+cox_res <- ezcox(coxdata, time = "OS.time", status = "OS", covariates = geneList40, global_method = c("likelihood", "wald", "logrank"))
 unicox <- cox_res
 unicox[1:5,1:6]
 nrow(unicox)
@@ -1637,7 +1710,7 @@ ncol(unicox)
 # 4 CASP3    FALSE      CASP3          CASP3           6678  6678
 # 5 MAP1LC3A FALSE      MAP1LC3A       MAP1LC3A        6678  6678
 # > nrow(unicox)
-# [1] 39
+# [1] 40
 # > ncol(unicox)
 # [1] 12
 
@@ -1664,7 +1737,7 @@ ncol(unicox)
 # 4 CASP3    FALSE      CASP3          CASP3           6678  6678
 # 5 MAP1LC3A FALSE      MAP1LC3A       MAP1LC3A        6678  6678
 # > nrow(unicox)
-# [1] 39
+# [1] 40
 # > ncol(unicox)
 # [1] 12
 
@@ -1681,6 +1754,7 @@ uni_gene
 # [19] "PRNP"     "ATP7A"    "SP1"      "MT-CO1"   "DBH"      "SLC11A2"
 # [25] "ANG"      "S100A12"  "ATP6AP1"  "ADAM10"   "MT-CO2"   "CP"
 # [31] "PRND"     "AQP1"     "MT1X"     "IL1A"     "XAF1"
+
 print(paste(uni_gene, collapse=", "))
 # > print(paste(uni_gene, collapse=", "))
 # [1] "CDK1, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, FOXO1, ARF1, GPC1, AOC3, SORD, PRNP, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, PRND, AQP1, MT1X, IL1A, XAF1"
@@ -2360,5 +2434,597 @@ head(dat)
 # Latex table
 dat[,2]<-format(as.numeric(dat[,2]),big.mark=",")
 print(latex.table.by(dat, format.args = list(digits = 2, format = c("s", "d", "s", "s", "s"))), include.rownames = FALSE, include.colnames = TRUE, sanitize.text.function = force)
+
+#================================================================
+
+#================================================================
+# (15) SNV
+# Local
+#================================================================
+
+# Read critical copper genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# All 56 critical copper genes
+geneList56 <- x$gene
+
+# 39 popular critical cooper genes
+geneList39 <- x[which(x$frequency > 1),]$gene
+
+# 20 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList20 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+head(uni_gene)
+nrow(uni_gene)
+# > head(uni_gene)
+# x
+# 1     CDK1
+# 2    AP1S1
+# 3    CASP3
+# 4 MAP1LC3A
+# 5     SNCA
+# 6  TMPRSS6
+# > nrow(uni_gene)
+# [1] 35
+
+# Cox genes
+geneList18 <- geneList20[which(geneList20 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+print("35 genes")
+print(paste(uni_gene$x, collapse = ", "))
+print("18 genes")
+print(paste(geneList18, collapse = ", "))
+print("12 genes")
+print(paste(geneList12, collapse = ", "))
+# > print("35 genes")
+# [1] "35 genes"
+# > print(paste(uni_gene$x, collapse = ", "))
+# [1] "CDK1, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, FOXO1, ARF1, GPC1, AOC3, SORD, PRNP, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, PRND, AQP1, MT1X, IL1A, XAF1"
+# > print("18 genes")
+# [1] "18 genes"
+# > print(paste(geneList18, collapse = ", "))
+# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, ARF1, GPC1, SORD, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP"
+# > print("12 genes")
+# [1] "12 genes"
+# > print(paste(geneList12, collapse = ", "))
+# [1] "MAP1LC3A, SNCA, MAPT, JUN, CYP1A1, AOC3, PRNP, DBH, S100A12, AQP1, MT1X, XAF1"
+
+#================================================================
+
+#================================================================
+# (16) Copper genes - Genes related to copper metabolism
+# Local
+#================================================================
+# https://bioconductor.org/packages/release/data/experiment/vignettes/msigdb/inst/doc/msigdb.html
+
+library(msigdb)
+library(ExperimentHub)
+library(GSEABase)
+library(fgsea)
+
+# Local
+rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+# rootDir="/srv/scratch/z3538133/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+setwd(rootDir)
+source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
+
+# Pathways
+pathways <- c("WP_COPPER_HOMEOSTASIS", "HP_DECREASED_CIRCULATING_COPPER_CONCENTRATION",
+              "HP_ABNORMAL_CIRCULATING_COPPER_CONCENTRATION", "GOMF_COPPER_ION_TRANSMEMBRANE_TRANSPORTER_ACTIVITY",
+              "GOMF_COPPER_ION_BINDING", "GOMF_COPPER_CHAPERONE_ACTIVITY",
+              "GOBP_RESPONSE_TO_COPPER_ION", "GOBP_DETOXIFICATION_OF_COPPER_ION",
+              "GOBP_COPPER_ION_TRANSPORT", "GOBP_COPPER_ION_TRANSMEMBRANE_TRANSPORT",
+              "GOBP_COPPER_ION_IMPORT", "GOBP_COPPER_ION_HOMEOSTASIS",
+              "GOBP_CELLULAR_RESPONSE_TO_COPPER_ION", "GOBP_CELLULAR_COPPER_ION_HOMEOSTASIS")
+
+GMTdirLoc <- paste(rootDir, "/Data/msigdb_v2022.1.Hs_files_to_download_locally/msigdb_v2022.1.Hs_GMTs/", sep = "") # Directory containing all MSigDB .gmt files
+files <- c("c2.cp.wikipathways.v2022.1.Hs.symbols.gmt", "c5.hpo.v2022.1.Hs.symbols.gmt", "c5.go.mf.v2022.1.Hs.symbols.gmt", "c5.go.bp.v2022.1.Hs.symbols.gmt")
+
+r <- matrix(NA, nrow = 14, ncol = 2)
+ind <- 0
+allGenes <- c()
+for (i in 1:4) {
+  pathwaysSub <- gmtPathways(paste(GMTdirLoc, files[i], sep = ""))
+  ids <- which(names(pathwaysSub) %in% pathways)
+  for (j in 1:length(ids)) {
+    ind <- ind + 1
+    r[ind,1] <- names(pathwaysSub)[ids[j]]
+    r[ind,2] <- paste(pathwaysSub[[ids[j]]], collapse=", ")
+    allGenes <- c(allGenes, pathwaysSub[[ids[j]]])
+  }
+}
+
+# Test copper genes
+# Test pathways
+identical(pathways[order(pathways, decreasing = TRUE)], r[order(r[,1], decreasing = TRUE),1])
+# [1] TRUE
+# test 133 genes
+# copper.genelist <- c('ABCB6', 'ANKRD9', 'SLC31A1', 'SLC31A2', 'PRND', 'CCDC22', 'APP', 'ARF1', 'MT2A', 'ATOX1', 'ATP7A', 'ATP7B', 'PRNP', 'SCO1', 'COX19', 'SCO2', 'CYP1A1', 'DAXX', 'BACE1', 'AOC1', 'MT1DP', 'HSF1', 'AQP1', 'AQP2', 'MT1A', 'MT1B', 'MT1E', 'MT1F', 'MT1G', 'MT1H', 'MT1M', 'MT1X', 'MT3', 'NFE2L2', 'MT1HL1', 'SNCA', 'MAP1LC3A', 'MT4', 'BECN1', 'COMMD1', 'XIAP', 'CUTC', 'STEAP2', 'STEAP3', 'STEAP4', 'SLC11A2', 'COX17', 'CP', 'FKBP4', 'HEPHL1', 'MMGT1', 'HEPH', 'PARK7', 'AANAT', 'IL1A', 'LCAT', 'LOXL2', 'MT-CO1', 'PAM', 'ATP5F1D', 'SOD1', 'SOD3', 'SORD', 'TFRC', 'CDK1', 'MOXD2P', 'MTCO2P12', 'COX11', 'LACC1', 'DBH', 'DCT', 'ALB', 'F5', 'F8', 'OR5AR1', 'ADNP', 'ATP13A2', 'MOXD1', 'GPC1', 'ANG', 'SUMF1', 'AOC2', 'SNAI3', 'APOA4', 'CA6', 'LOX', 'LOXL1', 'MT-CO2', 'ACR', 'P2RX4', 'CUTA', 'HAMP', 'S100A5', 'S100A12', 'S100A13', 'SNCB', 'SNCG', 'TP53', 'TYR', 'LOXL4', 'LOXL3', 'AOC3', 'RNF7', 'CCS', 'AP1S1', 'AP1B1', 'TMPRSS6', 'SPATA5', 'COG2', 'ATP6V0A2', 'ATP6AP1', 'ADAM10', 'AKT1', 'MTF2', 'FOXO1', 'FOXO3', 'STEAP1', 'GSK3B', 'APC', 'JUN', 'MAPT', 'MDM2', 'MT1JP', 'MT1L', 'MTF1', 'PIK3CA', 'XAF1', 'PTEN', 'CCND1', 'SP1', 'ADAM17', 'CASP3', 'ADAM9')
+copper.genelist <- c('ABCB6', 'ANKRD9', 'SLC31A1', 'SLC31A2', 'PRND', 'CCDC22', 'APP', 'ARF1', 'MT2A', 'ATOX1', 'ATP7A', 'ATP7B', 'PRNP', 'SCO1', 'COX19', 'SCO2', 'CYP1A1', 'DAXX', 'BACE1', 'AOC1', 'MT1DP', 'HSF1', 'AQP1', 'AQP2', 'MT1A', 'MT1B', 'MT1E', 'MT1F', 'MT1G', 'MT1H', 'MT1M', 'MT1X', 'MT3', 'NFE2L2', 'MT1HL1', 'SNCA', 'MAP1LC3A', 'MT4', 'BECN1', 'COMMD1', 'XIAP', 'CUTC', 'STEAP2', 'STEAP3', 'STEAP4', 'SLC11A2', 'COX17', 'CP', 'FKBP4', 'HEPHL1', 'MMGT1', 'HEPH', 'PARK7', 'AANAT', 'IL1A', 'LCAT', 'LOXL2', 'MT-CO1', 'PAM', 'ATP5F1D', 'SOD1', 'SOD3', 'SORD', 'TFRC', 'CDK1', 'MOXD2P', 'MTCO2P12', 'COX11', 'LACC1', 'DBH', 'DCT', 'ALB', 'F5', 'F8', 'OR5AR1', 'ADNP', 'ATP13A2', 'MOXD1', 'GPC1', 'ANG', 'SUMF1', 'AOC2', 'SNAI3', 'APOA4', 'COA6', 'LOX', 'LOXL1', 'MT-CO2', 'ACR', 'P2RX4', 'CUTA', 'HAMP', 'S100A5', 'S100A12', 'S100A13', 'SNCB', 'SNCG', 'TP53', 'TYR', 'LOXL4', 'LOXL3', 'AOC3', 'RNF7', 'CCS', 'AP1S1', 'AP1B1', 'TMPRSS6', 'SPATA5', 'COG2', 'ATP6V0A2', 'ATP6AP1', 'ADAM10', 'AKT1', 'MTF2', 'FOXO1', 'FOXO3', 'STEAP1', 'GSK3B', 'APC', 'JUN', 'MAPT', 'MDM2', 'MT1JP', 'MT1L', 'MTF1', 'PIK3CA', 'XAF1', 'PTEN', 'CCND1', 'SP1', 'ADAM17', 'CASP3', 'ADAM9')
+allGenes <- unique(allGenes)
+# # Gene CA6 in copper.genelist should be COA6
+# copper.genelist <- copper.genelist[-which(copper.genelist[] == "CA6")]
+# copper.genelist <- c(copper.genelist, "COA6")
+copper.genelist <- copper.genelist[order(copper.genelist, decreasing = TRUE)]
+allGenes <- allGenes[order(allGenes, decreasing = TRUE)]
+identical(copper.genelist,allGenes)
+# [1] TRUE
+
+colnames(r) <- c("Pathway", "Genes")
+write.xlsx(as.data.frame(r), paste(rootDir, "/Data/Output/CopperMetabolismPathways.xlsx", sep = ""))
+write.xlsx(as.data.frame(copper.genelist), paste(rootDir, "/Data/Output/CopperMetabolismGenes.xlsx", sep = ""))
+
+#================================================================
+# Pathways from Toni
+# Local
+rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+# rootDir="/srv/scratch/z3538133/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+setwd(rootDir)
+source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
+
+# Pathways
+pathways <- c("WP_COPPER_HOMEOSTASIS", "HP_DECREASED_CIRCULATING_COPPER_CONCENTRATION",
+              "HP_ABNORMAL_CIRCULATING_COPPER_CONCENTRATION", "GOMF_COPPER_ION_TRANSMEMBRANE_TRANSPORTER_ACTIVITY",
+              "GOMF_COPPER_ION_BINDING", "GOMF_COPPER_CHAPERONE_ACTIVITY",
+              "GOBP_RESPONSE_TO_COPPER_ION", "GOBP_DETOXIFICATION_OF_COPPER_ION",
+              "GOBP_COPPER_ION_TRANSPORT", "GOBP_COPPER_ION_TRANSMEMBRANE_TRANSPORT",
+              "GOBP_COPPER_ION_IMPORT", "GOBP_COPPER_ION_HOMEOSTASIS",
+              "GOBP_CELLULAR_RESPONSE_TO_COPPER_ION", "GOBP_CELLULAR_COPPER_ION_HOMEOSTASIS")
+
+GMTdirLoc <- paste(rootDir, "/Data/copper_genesets 2/", sep = "") # Directory containing all MSigDB .gmt files
+
+r <- matrix(NA, nrow = 14, ncol = 2)
+ind <- 0
+allGenes <- c()
+for (i in 1:14) {
+  pathwaysSub <- gmtPathways(paste(GMTdirLoc, pathways[i], ".v7.5.1.gmt", sep = ""))
+  ind <- ind + 1
+  r[ind,1] <- names(pathwaysSub)[1]
+  r[ind,2] <- paste(pathwaysSub[[1]], collapse=", ")
+  allGenes <- c(allGenes, pathwaysSub[[1]])
+}
+
+# Test copper genes
+# Test pathways
+identical(pathways[order(pathways, decreasing = TRUE)], r[order(r[,1], decreasing = TRUE),1])
+# [1] TRUE
+# test 133 genes
+# copper.genelist <- c('ABCB6', 'ANKRD9', 'SLC31A1', 'SLC31A2', 'PRND', 'CCDC22', 'APP', 'ARF1', 'MT2A', 'ATOX1', 'ATP7A', 'ATP7B', 'PRNP', 'SCO1', 'COX19', 'SCO2', 'CYP1A1', 'DAXX', 'BACE1', 'AOC1', 'MT1DP', 'HSF1', 'AQP1', 'AQP2', 'MT1A', 'MT1B', 'MT1E', 'MT1F', 'MT1G', 'MT1H', 'MT1M', 'MT1X', 'MT3', 'NFE2L2', 'MT1HL1', 'SNCA', 'MAP1LC3A', 'MT4', 'BECN1', 'COMMD1', 'XIAP', 'CUTC', 'STEAP2', 'STEAP3', 'STEAP4', 'SLC11A2', 'COX17', 'CP', 'FKBP4', 'HEPHL1', 'MMGT1', 'HEPH', 'PARK7', 'AANAT', 'IL1A', 'LCAT', 'LOXL2', 'MT-CO1', 'PAM', 'ATP5F1D', 'SOD1', 'SOD3', 'SORD', 'TFRC', 'CDK1', 'MOXD2P', 'MTCO2P12', 'COX11', 'LACC1', 'DBH', 'DCT', 'ALB', 'F5', 'F8', 'OR5AR1', 'ADNP', 'ATP13A2', 'MOXD1', 'GPC1', 'ANG', 'SUMF1', 'AOC2', 'SNAI3', 'APOA4', 'CA6', 'LOX', 'LOXL1', 'MT-CO2', 'ACR', 'P2RX4', 'CUTA', 'HAMP', 'S100A5', 'S100A12', 'S100A13', 'SNCB', 'SNCG', 'TP53', 'TYR', 'LOXL4', 'LOXL3', 'AOC3', 'RNF7', 'CCS', 'AP1S1', 'AP1B1', 'TMPRSS6', 'SPATA5', 'COG2', 'ATP6V0A2', 'ATP6AP1', 'ADAM10', 'AKT1', 'MTF2', 'FOXO1', 'FOXO3', 'STEAP1', 'GSK3B', 'APC', 'JUN', 'MAPT', 'MDM2', 'MT1JP', 'MT1L', 'MTF1', 'PIK3CA', 'XAF1', 'PTEN', 'CCND1', 'SP1', 'ADAM17', 'CASP3', 'ADAM9')
+copper.genelist <- c('ABCB6', 'ANKRD9', 'SLC31A1', 'SLC31A2', 'PRND', 'CCDC22', 'APP', 'ARF1', 'MT2A', 'ATOX1', 'ATP7A', 'ATP7B', 'PRNP', 'SCO1', 'COX19', 'SCO2', 'CYP1A1', 'DAXX', 'BACE1', 'AOC1', 'MT1DP', 'HSF1', 'AQP1', 'AQP2', 'MT1A', 'MT1B', 'MT1E', 'MT1F', 'MT1G', 'MT1H', 'MT1M', 'MT1X', 'MT3', 'NFE2L2', 'MT1HL1', 'SNCA', 'MAP1LC3A', 'MT4', 'BECN1', 'COMMD1', 'XIAP', 'CUTC', 'STEAP2', 'STEAP3', 'STEAP4', 'SLC11A2', 'COX17', 'CP', 'FKBP4', 'HEPHL1', 'MMGT1', 'HEPH', 'PARK7', 'AANAT', 'IL1A', 'LCAT', 'LOXL2', 'MT-CO1', 'PAM', 'ATP5F1D', 'SOD1', 'SOD3', 'SORD', 'TFRC', 'CDK1', 'MOXD2P', 'MTCO2P12', 'COX11', 'LACC1', 'DBH', 'DCT', 'ALB', 'F5', 'F8', 'OR5AR1', 'ADNP', 'ATP13A2', 'MOXD1', 'GPC1', 'ANG', 'SUMF1', 'AOC2', 'SNAI3', 'APOA4', 'COA6', 'LOX', 'LOXL1', 'MT-CO2', 'ACR', 'P2RX4', 'CUTA', 'HAMP', 'S100A5', 'S100A12', 'S100A13', 'SNCB', 'SNCG', 'TP53', 'TYR', 'LOXL4', 'LOXL3', 'AOC3', 'RNF7', 'CCS', 'AP1S1', 'AP1B1', 'TMPRSS6', 'SPATA5', 'COG2', 'ATP6V0A2', 'ATP6AP1', 'ADAM10', 'AKT1', 'MTF2', 'FOXO1', 'FOXO3', 'STEAP1', 'GSK3B', 'APC', 'JUN', 'MAPT', 'MDM2', 'MT1JP', 'MT1L', 'MTF1', 'PIK3CA', 'XAF1', 'PTEN', 'CCND1', 'SP1', 'ADAM17', 'CASP3', 'ADAM9')
+allGenes <- unique(allGenes)
+# # Gene CA6 in copper.genelist should be COA6
+# copper.genelist <- copper.genelist[-which(copper.genelist[] == "CA6")]
+# copper.genelist <- c(copper.genelist, "COA6")
+copper.genelist <- copper.genelist[order(copper.genelist, decreasing = TRUE)]
+allGenes <- allGenes[order(allGenes, decreasing = TRUE)]
+identical(copper.genelist,allGenes)
+# [1] TRUE
+
+colnames(r) <- c("Pathway", "Genes")
+write.xlsx(as.data.frame(r), paste(rootDir, "/Data/Output/CopperMetabolismPathways.xlsx", sep = ""))
+write.xlsx(as.data.frame(copper.genelist), paste(rootDir, "/Data/Output/CopperMetabolismGenes.xlsx", sep = ""))
+
+#================================================================
+
+#================================================================
+# (17) Expression of gene SLC31A1
+# Katana
+#================================================================
+# Katana
+# rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+rootDir="/srv/scratch/z3538133/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+setwd(rootDir)
+source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
+
+setwd(paste(rootDir, "/Data/SNV", sep = ""))
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+
+SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+               "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+               "In_Frame_Ins")
+
+set35Genes <- c("ATP7A", "CP", "TMPRSS6", "MAPT", "DBH",
+                "APP", "AOC3", "ADAM10", "SP1", "CYP1A1",
+                "XIAP", "FOXO1", "ATP6AP1", "SLC11A2", "GSK3B",
+                "GPC1", "PRNP", "AP1S1", "AQP1", "JUN",
+                "CDK1", "ARF1", "CASP3", "SORD", "IL1A",
+                "MAP1LC3A", "XAF1", "PRND", "SNCA", "S100A12",
+                "ANG", "COX17", "MT1X") # 33 left, 2 genes, MT-CO1 and MT-CO2, were removed due to the missing data
+
+top10Genes <- c("ATP7A", "CP", "APP", "MAPT", "DBH",
+                "TMPRSS6", "AOC3", "ADAM10", "SP1", "XIAP")
+
+geneIDs <- ensembldb::select(EnsDb.Hsapiens.v79, keys= top10Genes, keytype = "SYMBOL", columns = c("SYMBOL","GENEID"))
+# > geneIDs
+# SYMBOL          GENEID
+# 1    ATP7A ENSG00000165240
+# 2       CP ENSG00000047457
+# 3      APP ENSG00000142192
+# 4     MAPT ENSG00000186868
+# 5     MAPT ENSG00000276155
+# 6     MAPT ENSG00000277956
+# 7      DBH ENSG00000123454
+# 8  TMPRSS6 ENSG00000187045
+# 9     AOC3 ENSG00000131471
+# 10  ADAM10 ENSG00000137845
+# 11     SP1 ENSG00000185591
+# 12    XIAP ENSG00000101966
+# 13    XIAP          LRG_19
+
+geneID35s <- ensembldb::select(EnsDb.Hsapiens.v79, keys= set35Genes, keytype = "SYMBOL", columns = c("SYMBOL","GENEID"))
+
+n <- length(subtypes)
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  # Read data
+  dat <- as.data.frame(fread(paste(cancertype, "_maf_data.IdTrans.tsv", sep = "")))
+  # Only get necessary data
+  dat <- dat[,c("Variant_Classification", "Tumor_Sample_Barcode", "Gene")]
+  # > head(dat)
+  # Variant_Classification         Tumor_Sample_Barcode            Gene
+  # 1      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000122375
+  # 2                 Intron TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000090615
+  # 3      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000111796
+  # 4      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000165821
+  # 5                 Silent TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000137841
+  # 6        Frame_Shift_Del TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000169758
+  dat <- dat[which(dat$Variant_Classification %in% SNV_types),]
+  dat$CancerType <- cancertype
+  if(i == 1) {
+    r <- dat
+  } else {
+    r <- rbind(r,dat)
+  }
+}
+
+# Remove items from geneIDs which are not in r
+idx <- which(!(geneIDs$GENEID %in% r$Gene))
+top10GeneIDs <- geneIDs[-idx,]
+# > top10GeneIDs
+# SYMBOL          GENEID
+# 1    ATP7A ENSG00000165240
+# 2       CP ENSG00000047457
+# 3      APP ENSG00000142192
+# 4     MAPT ENSG00000186868
+# 7      DBH ENSG00000123454
+# 8  TMPRSS6 ENSG00000187045
+# 9     AOC3 ENSG00000131471
+# 10  ADAM10 ENSG00000137845
+# 11     SP1 ENSG00000185591
+# 12    XIAP ENSG00000101966
+# top10Genes <- c("ATP7A", "CP", "APP", "MAPT", "DBH",
+#                 "TMPRSS6", "AOC3", "ADAM10", "SP1", "XIAP")
+
+idx <- which(!(geneID35s$GENEID %in% r$Gene))
+top35GeneIDs <- geneID35s[-idx,]
+head(top35GeneIDs)
+nrow(top35GeneIDs)
+# > head(top35GeneIDs)
+# SYMBOL          GENEID
+# 1   ATP7A ENSG00000165240
+# 2      CP ENSG00000047457
+# 3 TMPRSS6 ENSG00000187045
+# 4    MAPT ENSG00000186868
+# 7     DBH ENSG00000123454
+# 8     APP ENSG00000142192
+# > nrow(top35GeneIDs)
+# [1] 33
+
+# Mutations for all genes
+saveRDS(r, "SNVAllGenes.rds")
+# r <- readRDS("SNVAllGenes.rds")
+
+# 35 genes
+saveRDS(r[which(r$Gene %in% top35GeneIDs$GENEID),], "SNV35Genes.rds")
+
+# Mutations for 10 genes
+saveRDS(r[which(r$Gene %in% top10GeneIDs$GENEID),], "SNV10Genes.rds")
+
+# Mutations for ATP7A
+saveRDS(r[which(r$Gene == "ENSG00000165240"),], "SNVATP7A.rds")
+
+SNVAllGenes <- readRDS("SNVAllGenes.rds")
+head(SNVAllGenes)
+# > head(SNVAllGenes)
+# Variant_Classification         Tumor_Sample_Barcode            Gene
+# 1      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000122375
+# 3      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000111796
+# 4      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000165821
+# 6        Frame_Shift_Del TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000169758
+# 7      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000104731
+# 9      Missense_Mutation TCGA-OR-A5J1-01A-11D-A29I-10 ENSG00000130935
+# CancerType
+# 1        ACC
+# 3        ACC
+# 4        ACC
+# 6        ACC
+# 7        ACC
+# 9        ACC
+SNV35Genes <- readRDS("SNV35Genes.rds")
+head(SNV35Genes)
+SNV10Genes <- readRDS("SNV10Genes.rds")
+head(SNV10Genes)
+# > head(SNV10Genes)
+# Variant_Classification         Tumor_Sample_Barcode            Gene
+# 452        Missense_Mutation TCGA-OR-A5J5-01A-11D-A29I-10 ENSG00000131471
+# 606          Frame_Shift_Del TCGA-OR-A5J5-01A-11D-A29I-10 ENSG00000187045
+# 1030       Missense_Mutation TCGA-OR-A5J8-01A-11D-A29I-10 ENSG00000123454
+# 9226       Missense_Mutation TCGA-OR-A5LL-01A-11D-A29I-10 ENSG00000047457
+# 20912      Missense_Mutation TCGA-4Z-AA7M-01A-11D-A391-08 ENSG00000137845
+# 6059            In_Frame_Del TCGA-4Z-AA84-01A-11D-A391-08 ENSG00000185591
+# CancerType
+# 452          ACC
+# 606          ACC
+# 1030         ACC
+# 9226         ACC
+# 20912       BLCA
+# 6059        BLCA
+SNVATP7A <- readRDS("SNVATP7A.rds")
+head(SNVATP7A)
+# > head(SNVATP7A)
+# Variant_Classification         Tumor_Sample_Barcode            Gene
+# 109072      Missense_Mutation TCGA-BT-A20J-01A-11D-A14W-08 ENSG00000165240
+# 62121       Missense_Mutation TCGA-FD-A3N6-01A-11D-A21A-08 ENSG00000165240
+# 64539       Missense_Mutation TCGA-FD-A3SQ-01A-21D-A22Z-08 ENSG00000165240
+# 89908       Missense_Mutation TCGA-GU-A763-01A-11D-A32B-08 ENSG00000165240
+# 118677      Missense_Mutation TCGA-UY-A78L-01A-12D-A339-08 ENSG00000165240
+# 133255      Missense_Mutation TCGA-XF-A9T6-01A-11D-A42E-08 ENSG00000165240
+# CancerType
+# 109072       BLCA
+# 62121        BLCA
+# 64539        BLCA
+# 89908        BLCA
+# 118677       BLCA
+# 133255       BLCA
+
+# For all genes, ~ 20K genes
+# SNVAllGenes
+# Number of patients
+npatientsAll <- length(unique(SNVAllGenes$Tumor_Sample_Barcode))
+npatientsAll
+# > npatientsAll
+# [1] 8523
+
+# 35 genes
+npatients35 <- length(unique(SNV35Genes$Tumor_Sample_Barcode))
+npatients35
+# > npatients35
+# [1] 1280
+
+# For 10 genes
+# SNV10Genes
+# Number of patients
+npatients10 <- length(unique(SNV10Genes$Tumor_Sample_Barcode))
+npatients10
+# > npatients10
+# [1] 887
+
+# For SNVATP7A
+# SNVATP7A
+# Number of patients
+npatientsATP7A <- length(unique(SNVATP7A$Tumor_Sample_Barcode))
+npatientsATP7A
+# > npatientsATP7A
+# [1] 202
+
+# Load the gene expression data
+loadData=function(gene) {
+  subtypes <- PanCancerAtlas_subtypes()
+  subtypes <- unique(subtypes$cancer.type)
+  subtypes <- c(subtypes, "PAAD")
+  subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+  subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+  n <- length(subtypes)
+  Cancer_type <- c()
+  Type <- c() # Tumour or Normal
+  Expression <- c()
+  Sample <- c() # Sample id
+  for (i in 1:n) {
+    cancertype <- subtypes[i]
+    outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
+    load(paste(outDir, "/gtex.", cancertype, ".raw.counts.RData", sep = "")) # return gtex.PAN.raw.counts
+    # transform
+    dat <- gtex.PAN.raw.counts
+    rownames(dat) <- dat$gene
+    dat <- dat[,-1]
+    dat <- dat + 1
+    dat <- log(dat, base = 2)
+    iGene <- which(rownames(dat) == gene)
+    r <- str_detect(colnames(dat), "TCGA")
+    nTumor <- length(which(r == TRUE))
+    nNormal <- ncol(dat) - nTumor
+    
+    Cancer_type <- c(Cancer_type, rep(cancertype, nTumor + nNormal))
+    Type <- c(Type, rep(c("Tumour", "Normal"), times = c(nTumor, nNormal)))
+    Expression <- c(Expression, as.numeric(dat[iGene,]))
+    Sample <- c(Sample, colnames(dat))
+  }
+  data=data.frame(Cancer_type, Type ,  Expression, Sample)
+  
+  return(data)
+}
+
+data <- loadData("SLC31A1")
+head(data)
+nrow(data)
+ncol(data)
+# > head(data)
+# Cancer_type   Type Expression          Sample
+# 1         ACC Tumour     9.1898 TCGA.OR.A5K3.01
+# 2         ACC Tumour    11.5430 TCGA.OR.A5J2.01
+# 3         ACC Tumour     8.8887 TCGA.OR.A5LN.01
+# 4         ACC Tumour    12.6425 TCGA.OR.A5KY.01
+# 5         ACC Tumour    10.5038 TCGA.OR.A5LG.01
+# 6         ACC Tumour    10.0334 TCGA.OR.A5JC.01
+# > nrow(data)
+# [1] 11329
+# > ncol(data)
+# [1] 4
+
+# Get tumor only
+data2 <- data[which(data$Type == "Tumour"),]
+head(data2)
+nrow(data2)
+ncol(data2)
+# > head(data2)
+# Cancer_type   Type Expression          Sample
+# 1         ACC Tumour     9.1898 TCGA.OR.A5K3.01
+# 2         ACC Tumour    11.5430 TCGA.OR.A5J2.01
+# 3         ACC Tumour     8.8887 TCGA.OR.A5LN.01
+# 4         ACC Tumour    12.6425 TCGA.OR.A5KY.01
+# 5         ACC Tumour    10.5038 TCGA.OR.A5LG.01
+# 6         ACC Tumour    10.0334 TCGA.OR.A5JC.01
+# > nrow(data2)
+# [1] 6732
+# > ncol(data2)
+# [1] 4
+
+# Remove samples with ATP7A mutation from SNV10Genes and SNVAllGenes
+patientsATP7A <- unique(SNVATP7A$Tumor_Sample_Barcode)
+SNV10Genes <- SNV10Genes[which(!(SNV10Genes$Tumor_Sample_Barcode %in% patientsATP7A)),]
+length(unique(SNV10Genes$Tumor_Sample_Barcode))
+# > length(unique(SNV10Genes$Tumor_Sample_Barcode))
+# [1] 685
+SNVAllGenes <- SNVAllGenes[which(!(SNVAllGenes$Tumor_Sample_Barcode %in% patientsATP7A)),]
+length(unique(SNVAllGenes$Tumor_Sample_Barcode))
+# > length(unique(SNVAllGenes$Tumor_Sample_Barcode))
+# [1] 8321
+
+# Get only patients with ATP7A mutation
+# For SNVATP7A
+patientsATP7A <- unique(SNVATP7A$Tumor_Sample_Barcode)
+head(patientsATP7A)
+length(patientsATP7A)
+# > head(patientsATP7A)
+# [1] "TCGA-BT-A20J-01A-11D-A14W-08" "TCGA-FD-A3N6-01A-11D-A21A-08"
+# [3] "TCGA-FD-A3SQ-01A-21D-A22Z-08" "TCGA-GU-A763-01A-11D-A32B-08"
+# [5] "TCGA-UY-A78L-01A-12D-A339-08" "TCGA-XF-A9T6-01A-11D-A42E-08"
+# > length(patientsATP7A)
+# [1] 202
+# Format sample id
+patientsATP7A <- substr(patientsATP7A, 1, 15)
+patientsATP7A <- gsub('-','.', patientsATP7A)
+data2ATP7A <- data2[which(data2$Sample %in% patientsATP7A),]
+head(data2ATP7A)
+nrow(data2ATP7A)
+summary(data2ATP7A$Expression)
+# > head(data2ATP7A)
+# Cancer_type   Type Expression          Sample
+# 860         BLCA Tumour    10.7322 TCGA.FD.A3SQ.01
+# 949         BLCA Tumour    11.2064 TCGA.BT.A20J.01
+# 1019        BRCA Tumour    10.7108 TCGA.A2.A0CR.01
+# 1036        BRCA Tumour    13.1542 TCGA.B6.A0WZ.01
+# 1067        BRCA Tumour    11.8321 TCGA.S3.AA14.01
+# 1122        BRCA Tumour    13.8388 TCGA.D8.A27V.01
+# > nrow(data2ATP7A)
+# [1] 119
+# > summary(data2ATP7A$Expression)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
+# 9.867  11.164  11.733  11.770  12.386  13.938
+
+# Get patients without ATP7A mutation among 10 genes
+patients10Genes <- unique(SNV10Genes$Tumor_Sample_Barcode)
+head(patients10Genes)
+length(patients10Genes)
+# > head(patients10Genes)
+# [1] "TCGA-OR-A5J5-01A-11D-A29I-10" "TCGA-OR-A5J8-01A-11D-A29I-10"
+# [3] "TCGA-OR-A5LL-01A-11D-A29I-10" "TCGA-4Z-AA7M-01A-11D-A391-08"
+# [5] "TCGA-4Z-AA84-01A-11D-A391-08" "TCGA-BL-A5ZZ-01A-31D-A30E-08"
+# > length(patients10Genes)
+# [1] 685
+# Format sample id
+patients10Genes <- substr(patients10Genes, 1, 15)
+patients10Genes <- gsub('-','.', patients10Genes)
+data210genes <- data2[which(data2$Sample %in% patients10Genes),]
+head(data210genes)
+nrow(data210genes)
+summary(data210genes$Expression)
+# > head(data210genes)
+# Cancer_type   Type Expression          Sample
+# 16          ACC Tumour    11.1485 TCGA.OR.A5LL.01
+# 38          ACC Tumour    10.2180 TCGA.OR.A5J5.01
+# 48          ACC Tumour    12.2009 TCGA.OR.A5J8.01
+# 836        BLCA Tumour    11.4757 TCGA.G2.A2EO.01
+# 843        BLCA Tumour    12.2949 TCGA.GV.A3QI.01
+# 865        BLCA Tumour    12.6432 TCGA.GV.A3JX.01
+# > nrow(data210genes)
+# [1] 402
+# > summary(data210genes$Expression)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
+# 8.234  11.225  11.807  11.802  12.343  14.925
+
+# Get patients without ATP7A mutation in all genes
+patientsAll <- unique(SNVAllGenes$Tumor_Sample_Barcode)
+head(patientsAll)
+length(patientsAll)
+# > head(patientsAll)
+# [1] "TCGA-OR-A5J1-01A-11D-A29I-10" "TCGA-OR-A5J2-01A-11D-A29I-10"
+# [3] "TCGA-OR-A5J3-01A-11D-A29I-10" "TCGA-OR-A5J4-01A-11D-A29I-10"
+# [5] "TCGA-OR-A5J5-01A-11D-A29I-10" "TCGA-OR-A5J6-01A-31D-A29I-10"
+# > length(patientsAll)
+# [1] 8321
+# Format sample id
+patientsAll <- substr(patientsAll, 1, 15)
+patientsAll <- gsub('-','.', patientsAll)
+data2All <- data2[which(data2$Sample %in% patientsAll),]
+head(data2All)
+nrow(data2All)
+summary(data2All$Expression)
+# > head(data2All)
+# Cancer_type   Type Expression          Sample
+# 1         ACC Tumour     9.1898 TCGA.OR.A5K3.01
+# 2         ACC Tumour    11.5430 TCGA.OR.A5J2.01
+# 3         ACC Tumour     8.8887 TCGA.OR.A5LN.01
+# 4         ACC Tumour    12.6425 TCGA.OR.A5KY.01
+# 5         ACC Tumour    10.5038 TCGA.OR.A5LG.01
+# 6         ACC Tumour    10.0334 TCGA.OR.A5JC.01
+# > nrow(data2All)
+# [1] 5401
+# > summary(data2All$Expression)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
+# 5.358  10.903  11.576  11.545  12.210  15.121
+
+f <- paste(rootDir, "/Data/Output/SLC31A1.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+
+data2ATP7A$Mutated <- "MutatedATP7A"
+data2All$Mutated <- "NotMutatedATP7A"
+combinedData <- rbind(data2ATP7A, data2All)
+head(combinedData)
+nrow(combinedData)
+ncol(combinedData)
+# > head(combinedData)
+# Cancer_type   Type Expression          Sample      Mutated
+# 860         BLCA Tumour    10.7322 TCGA.FD.A3SQ.01 MutatedATP7A
+# 949         BLCA Tumour    11.2064 TCGA.BT.A20J.01 MutatedATP7A
+# 1019        BRCA Tumour    10.7108 TCGA.A2.A0CR.01 MutatedATP7A
+# 1036        BRCA Tumour    13.1542 TCGA.B6.A0WZ.01 MutatedATP7A
+# 1067        BRCA Tumour    11.8321 TCGA.S3.AA14.01 MutatedATP7A
+# 1122        BRCA Tumour    13.8388 TCGA.D8.A27V.01 MutatedATP7A
+# > nrow(combinedData)
+# [1] 5520
+# > ncol(combinedData)
+# [1] 5
+
+boxplot(Expression~Mutated,data=combinedData, main="",
+        xlab="Mutated in ATP7A", ylab="SLC31A1 Expression")
+
+dev.off()
 
 #================================================================
