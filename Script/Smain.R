@@ -217,15 +217,7 @@ load(paste(outDir, "/expData.RData", sep = ""))
 edges <- read.csv(file = paste(rootDir, "/Data/stringInteractions.csv", sep = ""))
 load(file = paste(outDir, "/DEG_limmavoom.Rdata", sep = ""))
 x <- DEG_limmavoom[which(DEG_limmavoom$change %in% c("UP", "DOWN")),]
-#load(file = paste(outDir, "/TCGA_DEG_list.Rdata", sep = ""))
-#DEGlist[1:5,1:6]
-# > DEGlist[1:5,1:6]
-# gene   logFC.y    AveExpr         t      P.Value    adj.P.Val
-# 1  A2ML1  742.7040  663.94348  2.594199 9.580964e-03 1.281500e-02
-# 2 A4GALT -411.5535 1031.71059 -5.923662 3.964160e-09 7.287027e-09
-# 3  AADAC -114.8893   73.71043 -2.404663 1.631762e-02 2.143381e-02
-# 4  AAGAB 3740.6744 4176.41273 20.294718 2.122034e-80 5.689468e-79
-# 5   AARD 3040.2875 2815.25922  4.591833 4.791405e-06 7.775066e-06
+
 selectedGenes <- rownames(x)
 # selectedGenes <- DEGlist$gene
 interactions <- edges[, c(1, 2)]
@@ -236,40 +228,16 @@ interactions <- interactions[which(interactions$effect %in% colnames(expData$mRN
 interactions <- interactions[which(interactions$effect %in% selectedGenes),]
 nodes <- unique(union(interactions$cause, interactions$effect))
 length(nodes)
-# > length(nodes)
-# [1] 5431
 
 # TFs: Download the list from http://fantom.gsc.riken.jp/5/sstar/Browse_Transcription_Factors_hg19
 tfs <- read.csv(paste(rootDir, "/Data/Browse Transcription Factors hg19 - resource_browser.csv",
                       sep = ""))
 i <- which(tfs$Symbol %in% nodes)
 tfData <- expData$mRNAs[, tfs$Symbol[i]]
-# > tfData[1:5,1:6]
-# VDR    TP53    TLX1  TFAP2A   TAL1   STAT1
-# TCGA.C8.A1HL.01 10.5897 11.8849  2.5850 12.5833 7.6582 12.4747
-# TCGA.EW.A2FS.01 11.5953 11.8416  4.1699 14.0325 7.8462 13.5207
-# TCGA.E2.A153.11 11.5873 12.1033  1.0000 12.3509 8.2166 12.5918
-# TCGA.A2.A3XX.01 11.9535 13.6076 11.2367 14.0319 6.2288 13.3523
-# TCGA.BH.A0BQ.11 12.2536 12.4270  0.0000 12.3726 8.3912 13.2519
-# > nrow(tfData)
-# [1] 1212
-# > ncol(tfData)
-# [1] 428
 
 # Update cancer data of mRNAs
 expData$mRNAs <- expData$mRNAs[, nodes[which(!(nodes %in% tfs$Symbol[i]))]]
 mRNAsData_Cancer <-  expData$mRNAs
-# > mRNAsData_Cancer[1:5,1:6]
-# CX3CL1    CD74    RALA   MYOC CYP51A1 TMEM132A
-# TCGA.C8.A1HL.01  8.8796 15.6070 11.7444 1.0000 11.6847   9.7499
-# TCGA.EW.A2FS.01 11.6684 16.6298 11.6904 3.4594 12.2578  12.1536
-# TCGA.E2.A153.11 14.7055 15.8463 11.4929 6.7549 12.7633  11.3225
-# TCGA.A2.A3XX.01 13.0710 16.3286 12.2070 3.3219 11.2004  13.7007
-# TCGA.BH.A0BQ.11 15.0057 16.1949 11.5018 6.4263 12.0392  10.9462
-# > nrow(mRNAsData_Cancer)
-# [1] 1212
-# > ncol(mRNAsData_Cancer)
-# [1] 5003
 
 # Get the cancer data of miRNAs
 # miRNAsData_Cancer <-  expData$miRs
@@ -289,17 +257,6 @@ for (i in 1:n) {
 if(length(l) > 0) {
   mRNAsData_Cancer <- mRNAsData_Cancer[,-l]
 }
-# > mRNAsData_Cancer[1:5,1:6]
-#                     MAST2   RAB22A    TRAP1    BMPR2      FYN   PARD6B
-# TCGA.S9.A6WQ.01A 11.60455 11.47624 12.00843 12.19044 14.54279 6.727920
-# TCGA.DB.A64V.01A 10.73809 11.69479 11.69610 11.97692 14.41144 7.066089
-# TCGA.DU.8162.01A 12.09243 12.32839 11.96795 13.99179 13.81858 6.807355
-# TCGA.HT.7858.01A 11.72664 11.57080 12.18982 12.91737 14.62085 7.159871
-# TCGA.TM.A84C.01A 12.63458 12.16836 11.88303 12.90914 14.20013 7.971544
-# > nrow(mRNAsData_Cancer)
-# [1] 529
-# > ncol(mRNAsData_Cancer)
-# [1] 5037
 
 # TFs
 n <- ncol(tfData) # number of genes
@@ -314,17 +271,6 @@ for (i in 1:n) {
 if(length(l) > 0) {
   tfData <- tfData[,-l]
 }
-# > tfData[1:5,1:6]
-#                      ZEB1      VDR     USF1     TP53     TLX1   TFAP2A
-# TCGA.S9.A6WQ.01A 12.86728 2.584963 12.05833 11.68212 6.768184 5.672425
-# TCGA.DB.A64V.01A 12.54255 4.000000 11.91252 11.11439 8.658211 8.499846
-# TCGA.DU.8162.01A 13.05748 5.700440 11.35645 10.57554 1.000000 5.426265
-# TCGA.HT.7858.01A 13.97951 4.643856 11.88760 11.75071 3.584963 8.076816
-# TCGA.TM.A84C.01A 14.59625 9.167418 11.20762 11.84078 0.000000 2.321928
-# > nrow(tfData)
-# [1] 529
-# > ncol(tfData)
-# [1] 813
 
 # Combine data
 nomiR <- ncol(miRNAsData_Cancer) # if expData$miRs is NA, nomiR is null
@@ -346,12 +292,34 @@ cancer_network <- buildNetwork(interactions, nomiR, nomR, noTF, cancer_data, roo
 # Save the network
 write.csv(cancer_network, paste(outDir, "/cancer_network.csv", sep = ""), row.names = FALSE)
 
-# Analyse network
-noEdge <- analyseNetwork(0,nomR, noTF, cancer_network, cancer_data,
-               paste(outDir, "/cancer_network_analysis.txt", sep = ""))
+# # remove duplicated
+# subtypes <- PanCancerAtlas_subtypes()
+# subtypes <- unique(subtypes$cancer.type)
+# subtypes <- c(subtypes, "PAAD")
+# subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+# subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+# n <- length(subtypes)
+# 
+# for (i in 1:n) {
+#   
+#   cancertype <- subtypes[i]
+#   outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
+#   
+#   # Network
+#   network <- read.csv(paste(outDir, "/cancer_network.csv", sep = ""))
+#   
+#   network <- unique(network)
+#   
+#   # Save the network
+#   write.csv(network, paste(outDir, "/cancer_network.csv", sep = ""), row.names = FALSE)
+# }
 
-f <- paste(outDir, "/", cancertype, "_output.txt", sep = "")
-write("Number of nodes",file=f,append=TRUE)
-write(paste(nomR + noTF, " nodes", sep = ""),file=f,append=TRUE)
-write("Number of edges",file=f,append=TRUE)
-write(paste(noEdge, " edges", sep = ""),file=f,append=TRUE)
+# # Analyse network
+# noEdge <- analyseNetwork(0,nomR, noTF, cancer_network, cancer_data,
+#                paste(outDir, "/cancer_network_analysis.txt", sep = ""))
+# 
+# f <- paste(outDir, "/", cancertype, "_output.txt", sep = "")
+# write("Number of nodes",file=f,append=TRUE)
+# write(paste(nomR + noTF, " nodes", sep = ""),file=f,append=TRUE)
+# write("Number of edges",file=f,append=TRUE)
+# write(paste(noEdge, " edges", sep = ""),file=f,append=TRUE)
