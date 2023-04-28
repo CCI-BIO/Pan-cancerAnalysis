@@ -19,4 +19,4 @@ Note:</br>
     &nbsp;&nbsp;&nbsp;&nbsp;To develop our framework, we used the network control method, which is a library from the paper Liu, Y.-Y., et al. (2011). "Controllability of complex networks." Nature 473: 167. The library can be downloaded from https://scholar.harvard.edu/yyl/code. You may need to contact the authors to get the approval for the usage of the library.
 
 Contact information:</br>
-    &nbsp;&nbsp;&nbsp;&nbsp;If there are any issues with the method we encourage you to post on the issues section of this github page. If you are unable to do so please get in touch with Vu Viet Hoang Pham (vpham@ccia.org.au).
+    &nbsp;&nbsp;&nbsp;&nbsp;If there are any issues with the method we encourage you to post on the issues section of this github page. If you are unable to do so please get in touch with Vu Viet Hoang Pham (vu.v.pham@unsw.edu.au).
