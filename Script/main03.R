@@ -403,6 +403,15 @@ cv.fit <- cv.glmnet(x, y,
                     maxit = 1000000,
                     alpha=1)
 print(cv.fit)
+# > print(cv.fit)
+# 
+# Call:  cv.glmnet(x = x, y = y, family = "cox", maxit = 1e+06, alpha = 1) 
+# 
+# Measure: Partial Likelihood Deviance 
+# 
+# Lambda Index Measure     SE Nonzero
+# min 0.02459    19   10.42 0.5443       6
+# 1se 0.13121     1   10.83 0.4943       0
 plot(cv.fit)
 dev.off()
 

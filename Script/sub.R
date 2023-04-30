@@ -3,45 +3,51 @@
 rm(list = ls())
 
 # Load necessary libraries if any
+require(data.table)
+library(RColorBrewer)
+library(edgeR)
+library(survival)
+library(wesanderson)
+library(TCGAbiolinks)
+library(ggplot2)
+library(tidyverse)
+library(readr)
+library(reshape2)
+library(maftools)
+library(CancerSubtypes)
+library("SNFtool")
+library(ezcox)
+library(g3viz)
+
 library(datasets)
 library(taRifx)
 library(xtable)
-library(TCGAbiolinks)
 library(UpSetR)
 library(STRINGdb)
 library(writexl)
 library(dplyr)
 library(mygene)
-library(ggplot2)
 library(stringr)
 library(reshape)
 library(plyr)
 library(scales)
 library(ggpubr)
-library(CancerSubtypes)
-library(survival)
-library(wesanderson)
-library("SNFtool")
 library(gridExtra)
 library(openxlsx)
-library(RColorBrewer)
-library(tidyverse)
 library(hrbrthemes)
 library(viridis)
 library(plotly)
 library(heatmaply)
 library(forcats)
-library(ezcox)
 library(glmnet)
 library(RTCGAToolbox)
 library(reticulate)
-require(data.table)
 library("biomaRt")
 library(EnsDb.Hsapiens.v79)
-library(edgeR)
 library(GGally)
 library(network)
 library(sna)
+library(umap)
 
 #---------------------------------------
 # Set environment variables if any
@@ -72,6 +78,19 @@ setwd(rootDir)
 
 # Include the script of functions
 source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
+
+# qsub -I -l select=1:ncpus=2:mem=24gb,walltime=9:00:00
+
+# module load gcc/7.5.0
+# module load R/4.0.2-gcc7
+# module unload gcc/7.5.0
+# module load gcc/8.4.0
+
+# qsub -I -l select=1:ncpus=2:mem=24gb,walltime=9:00:00
+# module load gcc/12.2.0
+# module load r/4.2.2
+# module load gsl/2.7.1
+# R
 
 # #================================================================
 # # (-2) Table for data
@@ -174,10 +193,11 @@ colnames(t) <- c('Cancer type', 'Number of nodes', 'Number of edges', 'Number of
 for (i in 1:n) {
   cancertype <- subtypes[i]
   outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
-  net <- read.table(paste(outDir, "/cancer_network_analysis.txt", sep = ""), header = FALSE, sep = "\t", dec = ".", fill = TRUE)
+  # net <- read.table(paste(outDir, "/cancer_network_analysis.txt", sep = ""), header = FALSE, sep = "\t", dec = ".", fill = TRUE)
+  net <- read.csv(paste(outDir, "/cancer_network.csv", sep = ""))
   t[i,1] <- cancertype
-  t[i,2] <- as.numeric(net[1,3])
-  t[i,3] <- as.numeric(net[5,3])
+  t[i,2] <- length(unique(c(net[,1], net[,2])))
+  t[i,3] <- nrow(net)
   cri <- read.csv(paste(outDir, "/critical_nodes.csv", sep = ""), header = TRUE, sep = ",", dec = ".")
   t[i,4] <- nrow(cri)
 }
@@ -611,69 +631,101 @@ setwd(rootDir)
 # Include the script of functions
 source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
 
-# Enrichment analysis
+# Read critical copper genes
 outDir <- paste(rootDir, "/Data/Output", sep = "")
 fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
-selectedCriticalCopperGenes <- read.csv(fileName)
-cat(selectedCriticalCopperGenes$gene, sep = '\n')
-# > cat(selectedCriticalCopperGenes$gene, sep = '\n')
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# All 57 critical copper genes
+geneList57 <- x$gene
+
+# 40 popular critical cooper genes
+geneList40 <- x[which(x$frequency > 1),]$gene
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+head(uni_gene)
+nrow(uni_gene)
+# > head(uni_gene)
+# x
+# 1     CDK1
+# 2    AP1S1
+# 3    CASP3
+# 4 MAP1LC3A
+# 5     SNCA
+# 6  TMPRSS6
+# > nrow(uni_gene)
+# [1] 35
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+print("35 genes")
+print(paste(uni_gene$x, collapse = ", "))
+print("18 genes")
+print(paste(geneList18, collapse = ", "))
+print("12 genes")
+print(paste(geneList12, collapse = ", "))
+# > print("35 genes")
+# [1] "35 genes"
+# > print(paste(uni_gene$x, collapse = ", "))
+# [1] "CDK1, AP1S1, CASP3, MAP1LC3A, SNCA, TMPRSS6, MAPT, GSK3B, JUN, APP, CYP1A1, COX17, XIAP, FOXO1, ARF1, GPC1, AOC3, SORD, PRNP, ATP7A, SP1, MT-CO1, DBH, SLC11A2, ANG, S100A12, ATP6AP1, ADAM10, MT-CO2, CP, PRND, AQP1, MT1X, IL1A, XAF1"
+# > print("18 genes")
+# [1] "18 genes"
+# > print(paste(geneList18, collapse = ", "))
+# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, ARF1, GPC1, SORD, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP"
+# > print("12 genes")
+# [1] "12 genes"
+# > print(paste(geneList12, collapse = ", "))
+# [1] "MAP1LC3A, SNCA, MAPT, JUN, CYP1A1, AOC3, PRNP, DBH, S100A12, AQP1, MT1X, XAF1"
+
+geneList30 <- c(geneList18, geneList12)
+cat(geneList30, sep = '\n')
+# > cat(geneList30, sep = '\n')
 # CDK1
-# ALB
 # AP1S1
 # CASP3
-# MAP1LC3A
-# SNCA
 # TMPRSS6
-# MAPT
 # GSK3B
-# JUN
 # APP
-# CYP1A1
 # COX17
 # XIAP
-# TP53
-# FOXO1
-# COA6
 # ARF1
 # GPC1
-# AOC3
 # SORD
-# PRNP
-# F5
 # ATP7A
 # SP1
 # MT-CO1
-# DBH
 # SLC11A2
-# ANG
-# S100A12
 # ATP6AP1
 # ADAM10
-# MT-CO2
 # CP
-# BACE1
-# PRND
+# MAP1LC3A
+# SNCA
+# MAPT
+# JUN
+# CYP1A1
+# AOC3
+# PRNP
+# DBH
+# S100A12
 # AQP1
 # MT1X
-# IL1A
 # XAF1
-# ANKRD9
-# APC
-# LOXL1
-# ATOX1
-# ADAM17
-# STEAP3
-# MMGT1
-# AP1B1
-# CCND1
-# AANAT
-# SPATA5
-# COMMD1
-# F8
-# SUMF1
-# HEPH
-# PARK7
-# LCAT
+
+# Do enrichment analysis
+
+# Analyse the results
 
 # Biological process
 GO_process <- read.table(paste(outDir, "/Enrich/GO_Biological_Process_2021_table.txt", sep=""),
@@ -762,31 +814,29 @@ dat <- read.csv(file = paste(outDir, "/Enrich/KEGG_2021_Human_table.csv", sep=""
 f <- paste(outDir, "/Enrich/KEGG_2021_Human_table.pdf", sep = "")
 pdf(file = f,  width = 12, height = 8, onefile=FALSE)
 # > dat$Term
-# [1] "Ferroptosis"                                                "Alzheimer disease"                                         
-# [3] "Colorectal cancer"                                          "Mineral absorption"                                        
-# [5] "Epithelial cell signaling in Helicobacter pylori infection" "p53 signaling pathway"                                     
-# [7] "Measles"                                                    "Breast cancer"                                             
-# [9] "Pathways of neurodegeneration"                              "AGE-RAGE signaling pathway in diabetic complications"      
-# [11] "Pathways in cancer"                                         "Endometrial cancer"                                        
-# [13] "Lysosome"                                                   "Human papillomavirus infection"                            
-# [15] "Cellular senescence"                                        "Wnt signaling pathway"                                     
-# [17] "Small cell lung cancer"                                     "Prostate cancer"                                           
-# [19] "Kaposi sarcoma-associated herpesvirus infection"            "Viral carcinogenesis"         
-# for (i in 1:top) {
-#   if(nchar(dat$Term[i]) > 23) {
-#     dat$Term[i] <- paste(substr(dat$Term[i],1,20), "...", sep = "")
-#   }
-# }
-dat$Term[5] <- "Epithelial cell signaling"
-dat$Term[10] <- "AGE-RAGE signaling pathway"
+# [1] "Ferroptosis"                                                "Epithelial cell signaling in Helicobacter pylori infection"
+# [3] "Alzheimer disease"                                          "Pathways of neurodegeneration"                             
+# [5] "Mineral absorption"                                         "Human immunodeficiency virus 1 infection"                  
+# [7] "Lipid and atherosclerosis"                                  "Colorectal cancer"                                         
+# [9] "IL-17 signaling pathway"                                    "Lysosome"                                                  
+# [11] "Pathways in cancer"                                         "Measles"                                                   
+# [13] "Apoptosis"                                                  "Tyrosine metabolism"                                       
+# [15] "Breast cancer"                                              "Non-alcoholic fatty liver disease"                         
+# [17] "Hepatitis B"                                                "Vibrio cholerae infection"                                 
+# [19] "Kaposi sarcoma-associated herpesvirus infection"            "Pathogenic Escherichia coli infection"    
+
+dat$Term[2] <- "Epithelial cell signaling"
 dat$Term[19] <- "Herpesvirus infection"
 dat$Term
 # > dat$Term
-# [1] "Ferroptosis"                    "Alzheimer disease"              "Colorectal cancer"              "Mineral absorption"            
-# [5] "Epithelial cell signaling"      "p53 signaling pathway"          "Measles"                        "Breast cancer"                 
-# [9] "Pathways of neurodegeneration"  "AGE-RAGE signaling pathway"     "Pathways in cancer"             "Endometrial cancer"            
-# [13] "Lysosome"                       "Human papillomavirus infection" "Cellular senescence"            "Wnt signaling pathway"         
-# [17] "Small cell lung cancer"         "Prostate cancer"                "Herpesvirus infection"          "Viral carcinogenesis"
+# [1] "Ferroptosis"                              "Epithelial cell signaling"                "Alzheimer disease"                       
+# [4] "Pathways of neurodegeneration"            "Mineral absorption"                       "Human immunodeficiency virus 1 infection"
+# [7] "Lipid and atherosclerosis"                "Colorectal cancer"                        "IL-17 signaling pathway"                 
+# [10] "Lysosome"                                 "Pathways in cancer"                       "Measles"                                 
+# [13] "Apoptosis"                                "Tyrosine metabolism"                      "Breast cancer"                           
+# [16] "Non-alcoholic fatty liver disease"        "Hepatitis B"                              "Vibrio cholerae infection"               
+# [19] "Herpesvirus infection"                    "Pathogenic Escherichia coli infection"   
+
 l <- dat$Term
 drawClustergram2(dat, "", l)
 dev.off()
@@ -821,35 +871,35 @@ f <- paste(outDir, "/Enrich/Reactome_2022_table.pdf", sep = "")
 pdf(file = f,  width = 12, height = 8, onefile=FALSE)
 dat$Term
 # > dat$Term
-# [1] "Iron uptake and transport Homo sapiens R-HSA-917937"                                                                     
-# [2] "Lysosome Vesicle Biogenesis Homo sapiens R-HSA-432720"                                                                   
-# [3] "Cellular responses to stress Homo sapiens R-HSA-2262752"                                                                 
-# [4] "Signaling by NOTCH Homo sapiens R-HSA-157118"                                                                            
-# [5] "Nef-mediates down modulation of cell surface receptors by recruiting them to clathrin adapters Homo sapiens R-HSA-164938"
-# [6] "Disease Homo sapiens R-HSA-1643685"                                                                                      
-# [7] "Transmembrane transport of small molecules Homo sapiens R-HSA-382551"                                                    
-# [8] "trans-Golgi Network Vesicle Budding Homo sapiens R-HSA-199992"                                                           
-# [9] "Clathrin derived vesicle budding Homo sapiens R-HSA-421837"                                                              
-# [10] "Metal ion SLC transporters Homo sapiens R-HSA-425410"                                                                    
-# [11] "The role of Nef in HIV-1 replication and disease pathogenesis Homo sapiens R-HSA-164952"                                 
-# [12] "SMAC binds to IAPs Homo sapiens R-HSA-111463"                                                                            
-# [13] "SMAC-mediated dissociation of IAP:caspase complexes Homo sapiens R-HSA-111464"                                           
-# [14] "SMAC-mediated apoptotic response Homo sapiens R-HSA-111469"                                                              
-# [15] "Apoptosis Homo sapiens R-HSA-109581"                                                                                     
-# [16] "Programmed Cell Death Homo sapiens R-HSA-5357801"                                                                        
-# [17] "Apoptotic cleavage of cellular proteins Homo sapiens R-HSA-111465"                                                       
-# [18] "Apoptotic factor-mediated response Homo sapiens R-HSA-111471"                                                            
-# [19] "Signaling by NOTCH1 t(7;9)(NOTCH1:M1580 K2555) Translocation Mutant Homo sapiens R-HSA-2660825"                          
-# [20] "Constitutive Signaling by NOTCH1 t(7;9)(NOTCH1:M1580 K2555) Translocation Mutant Homo sapiens R-HSA-2660826"   
+# [1] "Activation Of Caspases Thru Apoptosome-Mediated Cleavage R-HSA-111459"                          
+# [2] "SMAC (DIABLO) Binds To IAPs R-HSA-111463"                                                       
+# [3] "SMAC, XIAP-regulated Apoptotic Response R-HSA-111469"                                           
+# [4] "Iron Uptake And Transport R-HSA-917937"                                                         
+# [5] "Caspase-mediated Cleavage Of Cytoskeletal Proteins R-HSA-264870"                                
+# [6] "Advanced Glycosylation Endproduct Receptor Signaling R-HSA-879415"                              
+# [7] "Cytochrome C-Mediated Apoptotic Response R-HSA-111461"                                          
+# [8] "Amyloid Fiber Formation R-HSA-977225"                                                           
+# [9] "MyD88 Cascade Initiated On Plasma Membrane R-HSA-975871"                                        
+# [10] "Apoptotic Factor-Mediated Response R-HSA-111471"                                                
+# [11] "Deregulated CDK5 Triggers Neurodegenerative Pathways In Alzheimers Disease Models R-HSA-8862803"
+# [12] "TRAF6 Mediated Induction Of NFkB And MAP Kinases Upon TLR7/8 Or 9 Activation R-HSA-975138"      
+# [13] "MyD88 Dependent Cascade Initiated On Endosome R-HSA-975155"                                     
+# [14] "Toll Like Receptor 3 (TLR3) Cascade R-HSA-168164"                                               
+# [15] "Toll Like Receptor 7/8 (TLR7/8) Cascade R-HSA-168181"                                           
+# [16] "Insertion Of Tail-Anchored Proteins Into Endoplasmic Reticulum Membrane R-HSA-9609523"          
+# [17] "Post-translational Protein Phosphorylation R-HSA-8957275"                                       
+# [18] "Toll Like Receptor 9 (TLR9) Cascade R-HSA-168138"                                               
+# [19] "MyD88-independent TLR4 Cascade R-HSA-166166"                                                    
+# [20] "Degradation Of Extracellular Matrix R-HSA-1474228"     
 for (i in 1:top) {
   strL <- nchar(dat$Term[i])
   dat$Term[i] <- str_trim(substr(dat$Term[i],strL-12,strL))
 }
 dat$Term
 # > dat$Term
-# [1] "R-HSA-917937"  "R-HSA-432720"  "R-HSA-2262752" "R-HSA-157118"  "R-HSA-164938"  "R-HSA-1643685" "R-HSA-382551"  "R-HSA-199992"  "R-HSA-421837" 
-# [10] "R-HSA-425410"  "R-HSA-164952"  "R-HSA-111463"  "R-HSA-111464"  "R-HSA-111469"  "R-HSA-109581"  "R-HSA-5357801" "R-HSA-111465"  "R-HSA-111471" 
-# [19] "R-HSA-2660825" "R-HSA-2660826"
+# [1] "R-HSA-111459"  "R-HSA-111463"  "R-HSA-111469"  "R-HSA-917937"  "R-HSA-264870"  "R-HSA-879415"  "R-HSA-111461"  "R-HSA-977225"  "R-HSA-975871" 
+# [10] "R-HSA-111471"  "R-HSA-8862803" "R-HSA-975138"  "R-HSA-975155"  "R-HSA-168164"  "R-HSA-168181"  "R-HSA-9609523" "R-HSA-8957275" "R-HSA-168138" 
+# [19] "R-HSA-166166"  "R-HSA-1474228"
 l <- dat$Term
 drawClustergram2(dat, "", l)
 dev.off()
@@ -3230,10 +3280,163 @@ for (iType in 1:n) {
 
 write.csv(pList, paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes/pListUseCopperGenes.csv", sep = ""))
 
+#----------------------------------------
+# For triple negative breast cancer
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y[1:4,1:5]
+# > y[1:4,1:5]
+# gene frequency ACC  AML BLCA
+# 1  CDK1        18  UP   UP   UP
+# 2   ALB        13   0 DOWN    0
+# 3 AP1S1        11   0 DOWN    0
+# 4 CASP3         9   0    0    0
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Get only triple negative breast cancer (i.e., Basal)
+
+# Get cancer sub types
+subtypes <- c("BRCA")
+all <- PanCancerAtlas_subtypes()
+PAN.path.subtypes <- all[which(all$cancer.type %in% subtypes),]
+PAN.path.subtypes[1:5,1:6]
+nrow(PAN.path.subtypes)
+# # A tibble: 5 × 6
+# pan.samplesID                cancer.type Subtype_mRNA Subtyp…¹ Subty…² Subty…³
+# <chr>                        <chr>       <chr>        <chr>      <int> <chr>
+#   1 TCGA-E2-A158-11A-22R-A12D-07 BRCA        Normal       NA            NA NA
+# 2 TCGA-BH-A0DD-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 3 TCGA-BH-A1EO-11A-31R-A137-07 BRCA        LumA         NA            NA NA
+# 4 TCGA-BH-A0B5-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 5 TCGA-A7-A13G-11A-51R-A13Q-07 BRCA        LumA         NA            NA NA
+# # … with abbreviated variable names ¹​Subtype_DNAmeth, ²​Subtype_protein,
+# #   ³​Subtype_miRNA
+# [1] 1218
+PAN.subtypes <- PAN.path.subtypes
+i <- sapply(PAN.subtypes, is.factor)
+PAN.subtypes[i] <- lapply(PAN.subtypes[i], as.character)
+table(PAN.subtypes$Subtype_mRNA)
+# table(PAN.subtypes$Subtype_mRNA)
+# 
+# Basal   Her2   LumA   LumB Normal
+# 193     82    581    219    143
+
+# # make list of column IDs
+# tumour.pt.ID <- as.list(PAN.subtypes$pan.samplesID)
+# 
+# # replace - with . to match the colnames in the counts dataframe
+# tmp1 <- str_replace_all(tumour.pt.ID, "-", ".")
+
+PAN.subtypes <- as.data.frame(PAN.subtypes)
+PAN.subtypes$pan.samplesID <- substr(PAN.subtypes$pan.samplesID, 1, 15)
+PAN.subtypes[1:5,1:6]
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA-E2-A158-11        BRCA       Normal            <NA>              NA
+# 2 TCGA-BH-A0DD-11        BRCA         LumA            <NA>              NA
+# 3 TCGA-BH-A1EO-11        BRCA         LumA            <NA>              NA
+# 4 TCGA-BH-A0B5-11        BRCA         LumA            <NA>              NA
+# 5 TCGA-A7-A13G-11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+PAN.subtypes$pan.samplesID <- str_replace_all(PAN.subtypes$pan.samplesID, "-", ".")
+PAN.subtypes[1:5,1:6]
+nrow(PAN.subtypes)
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA.E2.A158.11        BRCA       Normal            <NA>              NA
+# 2 TCGA.BH.A0DD.11        BRCA         LumA            <NA>              NA
+# 3 TCGA.BH.A1EO.11        BRCA         LumA            <NA>              NA
+# 4 TCGA.BH.A0B5.11        BRCA         LumA            <NA>              NA
+# 5 TCGA.A7.A13G.11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+#   [1] 1218
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+subtype <- "BRCA"
+
+subDir <- "surCancerTypeUseCopperGenes"
+mainDir <- paste(rootDir, "/Data/Output", sep = "")
+dir.create(file.path(mainDir, subDir), showWarnings = FALSE)
+
+# pdf file
+cancertype <- subtype
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+dat <- surdata[which(surdata$cancertype == cancertype),]
+
+# Get subtype Basal
+type <- "Basal"
+coxdata <- as.data.frame(dat)
+patients <- PAN.subtypes[which(PAN.subtypes$Subtype_mRNA == type),1]
+
+coxdata <- coxdata[which(rownames(coxdata) %in% patients),]
+coxdata[1:3,1:4]
+nrow(coxdata)
+# nrow(coxdata)
+# cancertype OS OS.time  AANAT
+# TCGA.A1.A0SK.01       BRCA  1     967 1.5850
+# TCGA.A1.A0SO.01       BRCA  0     852 2.3219
+# TCGA.A1.A0SP.01       BRCA  0     584 1.0000
+# [1] 191
+
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,"BRCA"] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,"BRCA"] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,"BRCA"] %in% c("UP", "DOWN")),]$gene
+fup <- paste(outDir, "/", cancertype, "_surUp_triple.pdf", sep = "")
+fdown <- paste(outDir, "/", cancertype, "_surDown_triple.pdf", sep = "")
+# > upGeneList
+# [1] "CDK1"  "CASP3" "GSK3B" "XIAP"  "ARF1"  "SORD"
+# > downGeneList
+# [1] "ALB"      "MAP1LC3A" "SNCA"     "JUN"      "FOXO1"    "AOC3"     "S100A12"
+# > geneList
+# [1] "CDK1"     "ALB"      "CASP3"    "MAP1LC3A" "SNCA"     "GSK3B"
+# [7] "JUN"      "XIAP"     "FOXO1"    "ARF1"     "AOC3"     "SORD"
+# [13] "S100A12"
+
+if(length(upGeneList) > 0) {
+  pUp <- surAnalysis(coxdata, upGeneList, numGroup=2, K=20, alpha=0.5, fup, w = 9, h = 6)  
+} else {
+  pUp <- NA
+}
+if(length(downGeneList) > 0) {
+  pDown <- surAnalysis(coxdata, downGeneList, numGroup=2, K=20, alpha=0.5, fdown, w = 9, h = 6)
+} else {
+  pDown <- NA
+}
+
 #================================================================
 
 #================================================================
-# (20) Compare gene expression, copper genes, 18 & 12 genes, 23 cancer types
+# (20) Compare gene expression, copper genes, 18 & 12 genes, 23 cancer types, using count and cpm
 # run on server
 #================================================================
 
@@ -3275,6 +3478,7 @@ getHeatmapData=function(geneList) {
     dat <- dat[,-1]
     # dat <- dat + 1
     logCPM <- cpm(dat, prior.count=2, log=TRUE)
+    # scale columns, scale genes
     logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
     dat <- logCPM
     iGenes <- which(rownames(dat) %in% geneList)
@@ -3353,6 +3557,9 @@ geneList18_12 <- c(geneList18, geneList12)
 data <- getHeatmapData(geneList18_12)
 # Save a single object to a file
 saveRDS(data, paste(outDir, "/dataForHeatmap.rds", sep = ""))
+
+#-----------------------------------------
+# For block of normal and tumour
 # Restore it under a different name
 my_data <- readRDS(paste(outDir, "/dataForHeatmap.rds", sep = ""))
 
@@ -3405,6 +3612,64 @@ colSide <- brewer.pal(3, "Set2")[my_group2]
 # heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
 heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
 dev.off()
+#-----------------------------------------
+
+#-----------------------------------------
+# For pair of normal and tumour
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/dataForHeatmap.rds", sep = ""))
+
+# format the data
+dat <- my_data
+dat <- dat[,-c(1,2)] # remove columns of cancer type and type of normal or tumour
+dat <- t(dat)
+colnames(dat) <- paste(my_data[,1], "_", my_data[,2], sep = "")
+
+# get mean value
+r <- matrix(0, nrow = 30, ncol = 46)
+rownames(r) <- rownames(dat)
+colnames(r) <- c(1:46)
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+n <- length(subtypes)
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  tumour <- paste(cancertype, "_Tumour", sep = "")
+  normal <-  paste(cancertype, "_Normal", sep = "")
+  colnames(r)[(i-1)*2 + 1] <- normal
+  colnames(r)[(i-1)*2 + 2] <- tumour
+  for (j in 1:30) {
+    r[j, (i-1)*2 + 1] <- mean(dat[j, which(colnames(dat) == normal)])
+    r[j, (i-1)*2 + 2] <- mean(dat[j, which(colnames(dat) == tumour)])  
+  }
+  
+}
+
+# Divide by up genes and down genes
+# geneList18 <- gsub("[-]",".",geneList18)
+# geneList12 <- gsub("[-]",".",geneList12)
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% geneList18),]
+rr <- rbind(rr,r[which(row.names(r) %in% geneList12),])
+write.csv(rr, paste(outDir, "/rrForPair.csv", sep = ""), row.names=TRUE)
+
+# draw the chart
+f <- paste(outDir, "/heatmap18_12_pair.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, 18), rep(2,12))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+# my_group2 <- c(rep(1, 23), rep(2,23))
+# colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+# heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#-----------------------------------------
 
 #================================================================
 
@@ -3473,4 +3738,5554 @@ for (i in 1:n) {
   dev.off()
 }
 
+#================================================================
+
+#================================================================
+# (22) Compare gene expression, copper genes, 18 & 12 genes, 23 cancer types, using tpm, unit log2(tpm+0.001)
+# run on server
+#================================================================
+
+#----------------------------------------------------
+# (22.1) For TCGA data
+#----------------------------------------------------
+# gzip -d tcga_RSEM_gene_tpm.gz # this will remove gz file
+# gzip -d gtex_RSEM_gene_tpm.gz # this will remove gz file
+# awk 'NR <= 5 {print $1, $2, $3, $4, $5, $6}' tcga_RSEM_gene_tpm
+# (base) [z3538133@katana3 Data]$ awk 'NR <= 5 {print $1, $2, $3, $4, $5, $6}' tcga_RSEM_gene_tpm
+# sample TCGA-19-1787-01 TCGA-S9-A7J2-01 TCGA-G3-A3CH-11 TCGA-EK-A2RE-01 TCGA-44-6778-01
+# ENSG00000242268.2 -9.9658 0.2998 -9.9658 -9.9658 -9.9658
+# ENSG00000259041.1 -9.9658 -9.9658 -9.9658 -9.9658 -9.9658
+# ENSG00000270112.3 -3.8160 -3.0469 -9.9658 -9.9658 -5.5735
+# ENSG00000167578.16 5.2998 4.8881 3.5572 4.2563 5.3162
+PAN.file = paste(rootDir, "/Data/tcga_RSEM_gene_tpm.gz", sep ="")
+PAN.log2.tmp = read.table(PAN.file, header = TRUE, stringsAsFactors = FALSE, row.names = "sample")
+PAN.log2.tmp[1:5,1:6]
+nrow(PAN.log2.tmp)
+ncol(PAN.log2.tmp)
+# > PAN.log2.tmp[1:5,1:6]
+# TCGA.19.1787.01 TCGA.S9.A7J2.01 TCGA.G3.A3CH.11
+# ENSG00000242268.2          -9.9658          0.2998         -9.9658
+# ENSG00000259041.1          -9.9658         -9.9658         -9.9658
+# ENSG00000270112.3          -3.8160         -3.0469         -9.9658
+# ENSG00000167578.16          5.2998          4.8881          3.5572
+# ENSG00000278814.1          -9.9658         -9.9658         -9.9658
+# TCGA.EK.A2RE.01 TCGA.44.6778.01 TCGA.F4.6854.01
+# ENSG00000242268.2          -9.9658         -9.9658         -9.9658
+# ENSG00000259041.1          -9.9658         -9.9658         -9.9658
+# ENSG00000270112.3          -9.9658         -5.5735         -9.9658
+# ENSG00000167578.16          4.2563          5.3162          4.5161
+# ENSG00000278814.1          -9.9658         -9.9658         -9.9658
+# > nrow(PAN.log2.tmp)
+# [1] 60498
+# > ncol(PAN.log2.tmp)
+# [1] 10535
+
+# Create a subdataframe of data that only contains patient IDs from the PAN.path.subtypes dataframe
+# subtypes <- PanCancerAtlas_subtypes()
+# unique(subtypes$cancer.type)
+# > unique(subtypes$cancer.type)
+#  [1] "ACC"  "AML"  "BLCA" "BRCA" "LGG"  "GBM"  "ESCA" "COAD" "STAD" "READ" "HNSC" "KICH" "KIRC" "KIRP" "LIHC" "LUAD" "LUSC" "OVCA" "PCPG" "PRAD"
+# [21] "SKCM" "THCA" "UCEC" "UCS" 
+# > nrow(subtypes)
+# [1] 7734
+subtypes <- c("ACC", "AML", "BLCA", "BRCA", "LGG", "GBM", "ESCA", "COAD", "STAD", "READ", "HNSC", "KICH", "KIRC", "KIRP", "LIHC", "LUAD", "LUSC", "OVCA", "PCPG", "PRAD", "SKCM", "THCA", "UCEC", "UCS")
+all <- PanCancerAtlas_subtypes()
+PAN.path.subtypes <- all[which(all$cancer.type %in% subtypes),]
+PAN.subtypes <- PAN.path.subtypes
+i <- sapply(PAN.subtypes, is.factor)
+PAN.subtypes[i] <- lapply(PAN.subtypes[i], as.character)
+
+# make list of column IDs
+tumour.pt.ID <- as.list(PAN.subtypes$pan.samplesID) # makes list with 7734 elements
+
+# replace - with . to match the colnames in the tpm dataframe
+tmp1 <- str_replace_all(tumour.pt.ID, "-", ".")
+
+# subset patient IDs that were only in the subtypes dataframe
+# PAN.raw.counts <- PAN.raw.counts[,grep(paste(tmp1, collapse = "|"), x=names(PAN.raw.counts))] # Out of memory error
+header <- names(PAN.log2.tmp)
+header <- substr(header, 1, 12)
+i <- which(header %in% tmp1)
+PAN.log2.tmp <- PAN.log2.tmp[,i]
+ncol(PAN.log2.tmp)
+PAN.log2.tmp[1:5,1:6]
+# > ncol(PAN.log2.tmp)
+# [1] 3554
+# > PAN.log2.tmp[1:5,1:6]
+# TCGA.19.1787.01 TCGA.S9.A7J2.01 TCGA.F4.6854.01
+# ENSG00000242268.2          -9.9658          0.2998         -9.9658
+# ENSG00000259041.1          -9.9658         -9.9658         -9.9658
+# ENSG00000270112.3          -3.8160         -3.0469         -9.9658
+# ENSG00000167578.16          5.2998          4.8881          4.5161
+# ENSG00000278814.1          -9.9658         -9.9658         -9.9658
+# TCGA.AB.2863.03 TCGA.05.4420.01 TCGA.R6.A8WC.01
+# ENSG00000242268.2          -9.9658         -9.9658         -9.9658
+# ENSG00000259041.1          -9.9658         -9.9658         -9.9658
+# ENSG00000270112.3          -3.4580         -9.9658         -6.5064
+# ENSG00000167578.16          3.6242          4.2048          3.8581
+# ENSG00000278814.1          -9.9658         -9.9658         -9.9658
+
+# Convert ensembl IDs to gene names
+genecode.file <- paste(rootDir, "/Data/probeMap_gencode.v23.annotation.gene.probemap", sep = "")
+genecode <- read.table(genecode.file, header = TRUE, sep = "\t")
+genecode.tmp <- genecode[, 1:2]
+
+# convert rownames in dataframe into a column
+PAN.log2.tmp$Ensembl_ID <- rownames(PAN.log2.tmp)
+PAN.log2.tmp <- PAN.log2.tmp %>% dplyr::select(Ensembl_ID, everything())
+
+# match ensembl ID of genecode dataframe to PAN.log2.tmp dataframe
+PAN.log2.tmp <- merge(PAN.log2.tmp, genecode.tmp, by.x = "Ensembl_ID", by.y = "id")
+PAN.log2.tmp <- PAN.log2.tmp %>% dplyr::select(gene, everything())
+PAN.log2.tmp <- PAN.log2.tmp[ ,-2] # remove Ensembl_ID
+PAN.log2.tmp.unique <- aggregate(PAN.log2.tmp, by=list(PAN.log2.tmp$gene), FUN=mean)
+PAN.log2.tmp.unique[1:5,1:6]
+# > PAN.log2.tmp.unique[1:5,1:6]
+# Group.1 gene TCGA.19.1787.01 TCGA.S9.A7J2.01 TCGA.F4.6854.01
+# 1 5_8S_rRNA   NA         -9.9658         -9.9658         -9.9658
+# 2   5S_rRNA   NA         -9.9658         -9.9658         -9.9658
+# 3       7SK   NA         -9.9658         -9.9658         -9.9658
+# 4      A1BG   NA          2.0810          4.4842          1.2085
+# 5  A1BG-AS1   NA          0.9493          2.0707         -0.8599
+# TCGA.AB.2863.03
+# 1       -9.965800
+# 2       -9.081019
+# 3       -6.794567
+# 4        2.060400
+# 5        2.696200
+PAN.log2.tmp.unique$gene <- PAN.log2.tmp.unique$Group.1
+PAN.log2.tmp.unique <- PAN.log2.tmp.unique[ ,-1]
+# > PAN.log2.tmp.unique[1:5,1:6]
+# gene TCGA.19.1787.01 TCGA.S9.A7J2.01 TCGA.F4.6854.01 TCGA.AB.2863.03
+# 1 5_8S_rRNA         -9.9658         -9.9658         -9.9658       -9.965800
+# 2   5S_rRNA         -9.9658         -9.9658         -9.9658       -9.081019
+# 3       7SK         -9.9658         -9.9658         -9.9658       -6.794567
+# 4      A1BG          2.0810          4.4842          1.2085        2.060400
+# 5  A1BG-AS1          0.9493          2.0707         -0.8599        2.696200
+# TCGA.05.4420.01
+# 1         -9.9658
+# 2         -9.9658
+# 3         -9.9658
+# 4          5.9298
+# 5          1.7912
+
+# save data
+# write.csv(PAN.raw.counts.unique, paste(rootDir, "/data/output/",'PAN.raw.counts.unique.csv', sep = ""), row.names = F)
+save(PAN.log2.tmp.unique, file=paste(rootDir, "/Data/Output/",'PAN.log2.tmp.unique.RData', sep = ""))  
+
+#----------------------------------------------------
+
+# #----------------------------------------------------
+# # (22.2) For GTEX data
+# #----------------------------------------------------
+# 
+# GTEX.file <- paste(rootDir, "/Data/gtex_RSEM_gene_tpm.gz", sep = "")
+# gtex.log2.tmp <- read.table(GTEX.file, header = TRUE)
+# # > gtex.log2.tmp[1:5,1:6]
+# # sample GTEX.S4Q7.0003.SM.3NM8M GTEX.QV31.1626.SM.2S1QC
+# # 1  ENSG00000242268.2                 -3.4580                 -9.9658
+# # 2  ENSG00000259041.1                 -9.9658                 -9.9658
+# # 3  ENSG00000270112.3                 -3.6259                 -2.1779
+# # 4 ENSG00000167578.16                  4.5988                  4.6294
+# # 5  ENSG00000278814.1                 -9.9658                 -9.9658
+# # GTEX.13QIC.0011.R1a.SM.5O9CJ GTEX.ZPCL.0126.SM.4WWC8 GTEX.S33H.1226.SM.4AD69
+# # 1                      -9.9658                 -9.9658                 -2.7274
+# # 2                      -9.9658                 -9.9658                 -9.9658
+# # 3                      -1.8314                 -9.9658                 -9.9658
+# # 4                       6.4989                  5.5358                  3.7269
+# # 5                      -9.9658                 -9.9658                 -9.9658
+# # > nrow(gtex.log2.tmp)
+# # [1] 60498
+# # > ncol(gtex.log2.tmp)
+# # [1] 7863
+# GTEX.pheno.file <- paste(rootDir, "/Data/GTEX_phenotype.gz", sep = "")
+# gtex.pheno <- read.table(GTEX.pheno.file, header = TRUE, sep = "\t")
+# # > gtex.pheno[1:5,1:6]
+# # Sample body_site_detail..SMTSD. X_primary_site X_gender
+# # 1 GTEX-1117F-0226-SM-5GZZ7   Adipose - Subcutaneous Adipose Tissue   female
+# # 2 GTEX-1117F-0426-SM-5EGHI        Muscle - Skeletal         Muscle   female
+# # 3 GTEX-1117F-0526-SM-5EGHJ          Artery - Tibial   Blood Vessel   female
+# # 4 GTEX-1117F-0626-SM-5N9CS        Artery - Coronary   Blood Vessel   female
+# # 5 GTEX-1117F-0726-SM-5GIEN Heart - Atrial Appendage          Heart   female
+# # X_patient X_cohort
+# # 1 GTEX-1117F     GTEX
+# # 2 GTEX-1117F     GTEX
+# # 3 GTEX-1117F     GTEX
+# # 4 GTEX-1117F     GTEX
+# # 5 GTEX-1117F     GTEX
+# # > nrow(gtex.pheno)
+# # [1] 9783
+# # > ncol(gtex.pheno)
+# # [1] 6
+# 
+# # Create subset dataframe to contain only disease samples
+# # first filter out other rows not in disease
+# # > unique(gtex.pheno$X_primary_site)
+# #  [1] "Adipose Tissue"  "Muscle"          "Blood Vessel"    "Heart"           "Ovary"           "Uterus"          "Vagina"          "Breast"          "Skin"           
+# # [10] "Salivary Gland"  "Brain"           "Adrenal Gland"   "Thyroid"         "Lung"            "Spleen"          "Pancreas"        "Esophagus"       "Stomach"        
+# # [19] "Colon"           "Small Intestine" "Prostate"        "Testis"          "Nerve"           "Pituitary"       "Blood"           "Liver"           "Kidney"         
+# # [28] "Fallopian Tube"  "Bladder"         "Cervix Uteri"    "<not provided>"  "Bone Marrow"
+# gtex <- gtex.pheno[gtex.pheno$X_primary_site != "<not provided>", ]
+# # > nrow(gtex)
+# # [1] 9778
+# 
+# # make list of column IDs
+# gtex.sample.ID <- as.list(gtex$Sample)
+# gtex.sample.ID <- append(gtex.sample.ID, "sample")
+# 
+# # replace - with . to match the colnames in the dataframe
+# tmp2 <- str_replace_all(gtex.sample.ID, "-", ".")
+# 
+# # subset patient IDs that were only in the subtypes dataframe
+# # pan.log2.counts <- gtex.log2.counts[,grep(paste(tmp2, collapse = "|"), x=names(gtex.log2.counts))]
+# header <- names(gtex.log2.tmp)
+# i <- which(header %in% tmp2)
+# # > head(i)
+# # [1] 1 2 3 4 5 6
+# # > length(i)
+# # [1] 7859
+# pan.log2.tmp <- gtex.log2.tmp[,i]
+# # > pan.log2.tmp[1:5,1:6]
+# # sample GTEX.S4Q7.0003.SM.3NM8M GTEX.QV31.1626.SM.2S1QC
+# # 1  ENSG00000242268.2                 -3.4580                 -9.9658
+# # 2  ENSG00000259041.1                 -9.9658                 -9.9658
+# # 3  ENSG00000270112.3                 -3.6259                 -2.1779
+# # 4 ENSG00000167578.16                  4.5988                  4.6294
+# # 5  ENSG00000278814.1                 -9.9658                 -9.9658
+# # GTEX.13QIC.0011.R1a.SM.5O9CJ GTEX.ZPCL.0126.SM.4WWC8 GTEX.S33H.1226.SM.4AD69
+# # 1                      -9.9658                 -9.9658                 -2.7274
+# # 2                      -9.9658                 -9.9658                 -9.9658
+# # 3                      -1.8314                 -9.9658                 -9.9658
+# # 4                       6.4989                  5.5358                  3.7269
+# # 5                      -9.9658                 -9.9658                 -9.9658
+# # > nrow(pan.log2.tmp)
+# # [1] 60498
+# # > ncol(pan.log2.tmp)
+# # [1] 7859
+# 
+# # assign gene column as rowname
+# rownames(pan.log2.tmp) <- pan.log2.tmp[,"sample"]
+# pan.log2.tmp[ ,"sample"] <- NULL
+# # > pan.log2.tmp[1:5,1:4]
+# # GTEX.S4Q7.0003.SM.3NM8M GTEX.QV31.1626.SM.2S1QC
+# # ENSG00000242268.2                  -3.4580                 -9.9658
+# # ENSG00000259041.1                  -9.9658                 -9.9658
+# # ENSG00000270112.3                  -3.6259                 -2.1779
+# # ENSG00000167578.16                  4.5988                  4.6294
+# # ENSG00000278814.1                  -9.9658                 -9.9658
+# # GTEX.13QIC.0011.R1a.SM.5O9CJ GTEX.ZPCL.0126.SM.4WWC8
+# # ENSG00000242268.2                       -9.9658                 -9.9658
+# # ENSG00000259041.1                       -9.9658                 -9.9658
+# # ENSG00000270112.3                       -1.8314                 -9.9658
+# # ENSG00000167578.16                       6.4989                  5.5358
+# # ENSG00000278814.1                       -9.9658                 -9.9658
+# 
+# # convert ensembl IDs to gene names
+# gtex.genecode.file <- paste(rootDir, "/Data/probeMap_gencode.v23.annotation.gene.probemap", sep = "")
+# gtex.genecode <- read.table(gtex.genecode.file, header = TRUE, sep = "\t")
+# # > head(gtex.genecode)
+# # id         gene chrom chromStart chromEnd strand
+# # 1 ENSG00000223972.5      DDX11L1  chr1      11869    14409      +
+# #   2 ENSG00000227232.5       WASH7P  chr1      14404    29570      -
+# #   3 ENSG00000278267.1    MIR6859-1  chr1      17369    17436      -
+# #   4 ENSG00000243485.3 RP11-34P13.3  chr1      29554    31109      +
+# #   5 ENSG00000274890.1    MIR1302-2  chr1      30366    30503      +
+# #   6 ENSG00000237613.2      FAM138A  chr1      34554    36081      -
+# gtex.genecode.tmp <- gtex.genecode[, 1:2]
+# 
+# # assign rownames as a column so you can use the merge() function
+# pan.log2.tmp <- tibble::rownames_to_column(pan.log2.tmp, "Ensembl_ID") # Apply rownames_to_column
+# 
+# # match ensembl ID of genecode dataframe to log2.tmp dataframe
+# pan.log2.tmp <- merge(pan.log2.tmp, gtex.genecode.tmp, by.x = "Ensembl_ID", by.y = "id")
+# pan.log2.tmp <- pan.log2.tmp %>% dplyr::select(gene, everything())
+# pan.log2.tmp <- pan.log2.tmp[ ,-2]
+# pan.log2.tmp.unique <- aggregate(pan.log2.tmp, by=list(pan.log2.tmp$gene), FUN=mean)
+# pan.log2.tmp.unique$gene <-pan.log2.tmp.unique$Group.1
+# pan.log2.tmp.unique <- pan.log2.tmp.unique[ ,-1]
+# 
+# # save data
+# write.csv(pan.log2.tmp.unique,paste(rootDir, "/Data/Output/",'pan.log2.tmp.unique.csv', sep = ""), row.names = F)
+# save(pan.log2.tmp.unique, file=paste(rootDir, "/Data/Output/",'pan.log2.tmp.unique.RData', sep = ""))
+# 
+# #----------------------------------------------------
+
+#================================================================
+
+#================================================================
+# (23) Heat map for Survival analysis, using 18 genes and 12 genes for each cancer type
+# Run in server
+#================================================================
+
+# Get the necessary data for the heat map for each cancer type
+# rootDir: Root directory, the data will be in rootDir/Data/...
+# geneList: List of genes we need the data
+# cancertype: The cancer for the analysis
+getHeatmapDataForCancerType=function(rootDir, geneList, cancertype) {
+  
+  Cancer_type <- c()
+  Type <- c()
+  Expression <- c()
+  
+  outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
+  load(paste(outDir, "/gtex.", cancertype, ".raw.counts.RData", sep = "")) # return gtex.PAN.raw.counts, including both tumor and normal
+  # # transform
+  # dat <- gtex.PAN.raw.counts
+  # rownames(dat) <- dat$gene
+  # dat <- dat[,-1]
+  # dat <- dat + 1
+  # dat <- log(dat, base = 2)
+  # iGenes <- which(rownames(dat) %in% geneList)
+  # r <- str_detect(colnames(dat), "TCGA")
+  # nTumor <- length(which(r == TRUE))
+  # nNormal <- ncol(dat) - nTumor
+  
+  # compute logCPM
+  dat <- gtex.PAN.raw.counts
+  rownames(dat) <- dat$gene
+  dat <- dat[,-1]
+  # dat <- dat + 1
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  iGenes <- which(rownames(dat) %in% geneList)
+  r <- str_detect(colnames(dat), "TCGA")
+  nTumor <- length(which(r == TRUE))
+  nNormal <- ncol(dat) - nTumor
+  
+  # # Add * if being critical copper gene
+  # outDir <- paste(rootDir, "/Data/Output", sep = "")
+  # fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+  # selectedCriticalCopperGenes <- read.csv(fileName)
+  # if(selectedCriticalCopperGenes[which(selectedCriticalCopperGenes$gene == gene),cancertype] == 1){
+  #   cancertype <- paste("*", cancertype, sep = "")
+  # }
+  
+  Cancer_type <- c(Cancer_type, rep(cancertype, nTumor + nNormal))
+  Type <- c(Type, rep(c("Tumour", "Normal"), times = c(nTumor, nNormal)))
+  x <- dat[iGenes,]
+  x <- t(x)
+  # order by gene names
+  x <- x[, order(colnames(x), decreasing = FALSE)]
+  Expression <- rbind(Expression, x)
+  
+  data=data.frame(Cancer_type, Type ,  Expression)
+  
+  return(data)
+}
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+head(uni_gene)
+nrow(uni_gene)
+# > head(uni_gene)
+# x
+# 1     CDK1
+# 2    AP1S1
+# 3    CASP3
+# 4 MAP1LC3A
+# 5     SNCA
+# 6  TMPRSS6
+# > nrow(uni_gene)
+# [1] 35
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+# > geneList18
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# f18 <- paste(outDir, "/sur18.pdf", sep = "")
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+# > geneList12
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+# f12 <- paste(outDir, "/sur12.pdf", sep = "")
+# K	Number of nearest neighbors, default is 20
+# surAnalysis(surdata, geneList18, numGroup=2, K=20, alpha=0.5, f18, w = 9, h = 6)
+# surAnalysis(surdata, geneList12, numGroup=2, K=20, alpha=0.5, f12, w = 9, h = 6)
+print(paste(geneList18, collapse = ", "))
+print(paste(geneList12, collapse = ", "))
+# > print(paste(geneList18, collapse = ", "))
+# [1] "CDK1, AP1S1, CASP3, TMPRSS6, GSK3B, APP, COX17, XIAP, ARF1, GPC1, SORD, ATP7A, SP1, MT-CO1, SLC11A2, ATP6AP1, ADAM10, CP"
+# > print(paste(geneList12, collapse = ", "))
+# [1] "MAP1LC3A, SNCA, MAPT, JUN, CYP1A1, AOC3, PRNP, DBH, S100A12, AQP1, MT1X, XAF1"
+
+geneList18_12 <- c(geneList18, geneList12)
+# > geneList18_12
+# [1] "CDK1"     "AP1S1"    "CASP3"    "TMPRSS6"  "GSK3B"    "APP"
+# [7] "COX17"    "XIAP"     "ARF1"     "GPC1"     "SORD"     "ATP7A"
+# [13] "SP1"      "MT-CO1"   "SLC11A2"  "ATP6AP1"  "ADAM10"   "CP"
+# [19] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [25] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+data <- getHeatmapDataForCancerType(rootDir, geneList18_12, "LGG")
+# Save a single object to a file
+cancertype <- "LGG"
+saveRDS(data, paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+
+#---------------------------------------
+# For 18 & 12 genes, for normal and tumour
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type    ADAM10        AOC3      AP1S1
+# TCGA.S9.A7J2.01         LGG Tumour 0.4730344 -0.22753447  0.1251829
+# TCGA.DU.7302.01         LGG Tumour 0.9706330 -1.19686021  0.8742207
+# TCGA.P5.A5EX.01         LGG Tumour 0.3353221  0.79421141 -0.9714453
+# TCGA.HT.8563.01         LGG Tumour 1.1853219  0.09386498 -0.8300805
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 32
+# my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type    ADAM10        AOC3
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour 0.4730344 -0.22753447
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour 0.9706330 -1.19686021
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour 0.3353221  0.79421141
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour 1.1853219  0.09386498
+# > nrow(my_data)
+# [1] 453
+
+outDir <- paste(rootDir, "/Data/Output/surCancerType1812", sep = "")
+# load(paste(outDir, "/", cancertype, "_sur18.Rdata", sep = "")) # return result1
+# 
+# patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+# colnames(patients) <- c("patient_id", "group")
+# patients[,1] <- as.character(colnames(result1$distanceMatrix))
+# patients[,2] <- result1$group
+# # > head(patients)
+# # patient_id        group
+# # [1,] "TCGA.CS.4938.01" "2"
+# # [2,] "TCGA.CS.4941.01" "2"
+# # [3,] "TCGA.CS.4942.01" "2"
+# # [4,] "TCGA.CS.4943.01" "2"
+# # [5,] "TCGA.CS.4944.01" "2"
+# # [6,] "TCGA.CS.5390.01" "2"
+
+# new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+# new_dat <- new_dat %>% dplyr::select(group, everything())
+# new_dat <- new_dat[order(new_dat$group),]
+# # > new_dat[1:4,1:5]
+# # group      patient_id Cancer_type   Type    ADAM10
+# # 7      1 TCGA.CS.5393.01         LGG Tumour 0.8411652
+# # 8      1 TCGA.CS.5394.01         LGG Tumour 1.0374810
+# # 9      1 TCGA.CS.5395.01         LGG Tumour 0.4455639
+# # 15     1 TCGA.CS.6667.01         LGG Tumour 0.1035104
+# # > nrow(new_dat)
+# # [1] 348
+# # > ncol(new_dat)
+# # [1] 34
+
+# format the data
+# dat <- new_dat
+dat <- my_data
+dat <- dat[,-c(1,2,3)]
+dat <- t(dat)
+colnames(dat) <- paste(my_data[,1], "_", my_data[,3], sep = "")
+
+# For 18 genes & 12 genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% geneList18),]
+rr <- rbind(rr, r[which(row.names(r) %in% geneList12),])
+nTumour <- nrow(my_data[which(my_data$Type == "Tumour"),])
+nNormal <- nrow(my_data[which(my_data$Type == "Normal"),])
+tmp <- rr
+rr <- tmp[,(nTumour+1):(nTumour + nNormal)]
+rr <- cbind(rr, tmp[,1:nTumour])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmap18_12.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, 18), rep(2,12))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nNormal), rep(2,nTumour))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#---------------------------------------
+
+#---------------------------------------
+# For 18 genes, for 2 groups
+
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type    ADAM10        AOC3      AP1S1
+# TCGA.S9.A7J2.01         LGG Tumour 0.4730344 -0.22753447  0.1251829
+# TCGA.DU.7302.01         LGG Tumour 0.9706330 -1.19686021  0.8742207
+# TCGA.P5.A5EX.01         LGG Tumour 0.3353221  0.79421141 -0.9714453
+# TCGA.HT.8563.01         LGG Tumour 1.1853219  0.09386498 -0.8300805
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 32
+my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type    ADAM10        AOC3
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour 0.4730344 -0.22753447
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour 0.9706330 -1.19686021
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour 0.3353221  0.79421141
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour 1.1853219  0.09386498
+# > nrow(my_data)
+# [1] 348
+
+outDir <- paste(rootDir, "/Data/Output/surCancerType1812", sep = "")
+load(paste(outDir, "/", cancertype, "_sur18.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "2"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "2"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "2"
+# [6,] "TCGA.CS.5390.01" "2"
+
+new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+new_dat <- new_dat %>% dplyr::select(group, everything())
+new_dat <- new_dat[order(new_dat$group),]
+# > new_dat[1:4,1:5]
+# group      patient_id Cancer_type   Type    ADAM10
+# 7      1 TCGA.CS.5393.01         LGG Tumour 0.8411652
+# 8      1 TCGA.CS.5394.01         LGG Tumour 1.0374810
+# 9      1 TCGA.CS.5395.01         LGG Tumour 0.4455639
+# 15     1 TCGA.CS.6667.01         LGG Tumour 0.1035104
+# > nrow(new_dat)
+# [1] 348
+# > ncol(new_dat)
+# [1] 34
+
+# format the data
+dat <- new_dat
+# dat <- my_data
+dat <- dat[,-c(1,2,3,4)]
+colnames(dat) <- gsub("[.]","-",colnames(dat))
+dat <- dat[, which(colnames(dat) %in% geneList18)]
+dat <- t(dat)
+colnames(dat) <- paste(new_dat[,2], "_", new_dat[,1], sep = "")
+# > dat[1:5,1:4]
+# TCGA.CS.5393.01_1 TCGA.CS.5394.01_1 TCGA.CS.5395.01_1 TCGA.CS.6667.01_1
+# ADAM10          0.8411652         1.0374810        0.44556385        0.10351044
+# AP1S1          -0.8580676         0.9990138       -0.08959111       -1.67823550
+# APP            -0.2354364         0.5455580       -0.38693952       -0.08129716
+# ARF1           -0.6763754        -0.9576393       -1.61662152       -0.20378669
+# ATP6AP1        -0.8344859        -0.2209747       -1.69036999       -0.08097393
+# > nrow(dat)
+# [1] 18
+# > ncol(dat)
+# [1] 348
+
+# For 18 genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% geneList18),]
+#rr <- rbind(rr, r[which(row.names(r) %in% geneList12),])
+nGroup1 <- nrow(patients[which(patients[,2] == 1),])
+nGroup2 <- nrow(patients[which(patients[,2] == 2),])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmap18.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, 18))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nGroup1), rep(2,nGroup2))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For 12 genes, for 2 groups
+
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type    ADAM10        AOC3      AP1S1
+# TCGA.S9.A7J2.01         LGG Tumour 0.4730344 -0.22753447  0.1251829
+# TCGA.DU.7302.01         LGG Tumour 0.9706330 -1.19686021  0.8742207
+# TCGA.P5.A5EX.01         LGG Tumour 0.3353221  0.79421141 -0.9714453
+# TCGA.HT.8563.01         LGG Tumour 1.1853219  0.09386498 -0.8300805
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 32
+my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type    ADAM10        AOC3
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour 0.4730344 -0.22753447
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour 0.9706330 -1.19686021
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour 0.3353221  0.79421141
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour 1.1853219  0.09386498
+# > nrow(my_data)
+# [1] 348
+
+outDir <- paste(rootDir, "/Data/Output/surCancerType1812", sep = "")
+load(paste(outDir, "/", cancertype, "_sur12.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "2"
+# [2,] "TCGA.CS.4941.01" "1"
+# [3,] "TCGA.CS.4942.01" "2"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "2"
+# [6,] "TCGA.CS.5390.01" "2"
+
+new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+new_dat <- new_dat %>% dplyr::select(group, everything())
+new_dat <- new_dat[order(new_dat$group),]
+# > new_dat[1:4,1:5]
+# group      patient_id Cancer_type   Type    ADAM10
+# 2      1 TCGA.CS.4941.01         LGG Tumour 0.3482559
+# 9      1 TCGA.CS.5395.01         LGG Tumour 0.4455639
+# 11     1 TCGA.CS.5397.01         LGG Tumour 0.5036000
+# 12     1 TCGA.CS.6188.01         LGG Tumour 1.6559567
+# > nrow(new_dat)
+# [1] 348
+# > ncol(new_dat)
+# [1] 34
+
+# format the data
+dat <- new_dat
+# dat <- my_data
+dat <- dat[,-c(1,2,3,4)]
+colnames(dat) <- gsub("[.]","-",colnames(dat))
+dat <- dat[, which(colnames(dat) %in% geneList12)]
+dat <- t(dat)
+colnames(dat) <- paste(new_dat[,2], "_", new_dat[,1], sep = "")
+# > dat[1:5,1:4]
+# TCGA.CS.4941.01_1 TCGA.CS.5395.01_1 TCGA.CS.5397.01_1 TCGA.CS.6188.01_1
+# AOC3          -1.3205445         2.0679927        -0.3313792        -0.4341555
+# AQP1           2.2255065         2.3324790         1.6683529         1.5165818
+# CYP1A1        -1.5145701        -1.1529441         0.3998401        -1.2926878
+# DBH           -0.8451963         0.3102576         0.3214936        -0.4322281
+# JUN            0.9109134        -0.1858019         0.2628002         0.4970608
+# > nrow(dat)
+# [1] 12
+# > ncol(dat)
+# [1] 348
+
+# For 12 genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% geneList12),]
+#rr <- rbind(rr, r[which(row.names(r) %in% geneList12),])
+nGroup1 <- nrow(patients[which(patients[,2] == 1),])
+nGroup2 <- nrow(patients[which(patients[,2] == 2),])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmap12.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, 12))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nGroup1), rep(2,nGroup2))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#---------------------------------------
+
+#================================================================
+
+#================================================================
+# (24) Heat map for Survival analysis, using critical copper genes for each cancer type
+# Run in server
+#================================================================
+
+# Get the necessary data for the heat map for each cancer type
+# rootDir: Root directory, the data will be in rootDir/Data/...
+# geneList: List of genes we need the data
+# cancertype: The cancer for the analysis
+getHeatmapDataForCancerType=function(rootDir, geneList, cancertype) {
+  
+  Cancer_type <- c()
+  Type <- c()
+  Expression <- c()
+  
+  outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
+  load(paste(outDir, "/gtex.", cancertype, ".raw.counts.RData", sep = "")) # return gtex.PAN.raw.counts, including both tumor and normal
+  # # transform
+  # dat <- gtex.PAN.raw.counts
+  # rownames(dat) <- dat$gene
+  # dat <- dat[,-1]
+  # dat <- dat + 1
+  # dat <- log(dat, base = 2)
+  # iGenes <- which(rownames(dat) %in% geneList)
+  # r <- str_detect(colnames(dat), "TCGA")
+  # nTumor <- length(which(r == TRUE))
+  # nNormal <- ncol(dat) - nTumor
+  
+  # compute logCPM
+  dat <- gtex.PAN.raw.counts
+  rownames(dat) <- dat$gene
+  dat <- dat[,-1]
+  # dat <- dat + 1
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  iGenes <- which(rownames(dat) %in% geneList)
+  r <- str_detect(colnames(dat), "TCGA")
+  nTumor <- length(which(r == TRUE))
+  nNormal <- ncol(dat) - nTumor
+  
+  # # Add * if being critical copper gene
+  # outDir <- paste(rootDir, "/Data/Output", sep = "")
+  # fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+  # selectedCriticalCopperGenes <- read.csv(fileName)
+  # if(selectedCriticalCopperGenes[which(selectedCriticalCopperGenes$gene == gene),cancertype] == 1){
+  #   cancertype <- paste("*", cancertype, sep = "")
+  # }
+  
+  Cancer_type <- c(Cancer_type, rep(cancertype, nTumor + nNormal))
+  Type <- c(Type, rep(c("Tumour", "Normal"), times = c(nTumor, nNormal)))
+  x <- dat[iGenes,]
+  x <- t(x)
+  # order by gene names
+  x <- x[, order(colnames(x), decreasing = FALSE)]
+  Expression <- rbind(Expression, x)
+  
+  data=data.frame(Cancer_type, Type ,  Expression)
+  
+  return(data)
+}
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+# > y[1:4,1:5]
+# gene frequency ACC  AML BLCA
+# 1  CDK1        18  UP   UP   UP
+# 2   ALB        13   0 DOWN    0
+# 3 AP1S1        11   0 DOWN    0
+# 4 CASP3         9   0    0    0
+
+subDir <- "surCancerTypeUseCopperGenes"
+mainDir <- paste(rootDir, "/Data/Output", sep = "")
+dir.create(file.path(mainDir, subDir), showWarnings = FALSE)
+
+cancertype <- "LGG"
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] %in% c("UP", "DOWN")),]$gene
+
+data <- getHeatmapDataForCancerType(rootDir, geneList, "LGG")
+# Save a single object to a file
+saveRDS(data, paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+
+#---------------------------------------
+# For copper genes, for normal and tumour
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type        ALB     ATP7A       CASP3
+# TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519  1.10979667
+# TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239 -0.67663103
+# TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562  0.01558295
+# TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199  0.79229205
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 15
+# my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type        ALB     ATP7A
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199
+# > nrow(my_data)
+# [1] 453
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+# load(paste(outDir, "/", cancertype, "_sur18.Rdata", sep = "")) # return result1
+# 
+# patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+# colnames(patients) <- c("patient_id", "group")
+# patients[,1] <- as.character(colnames(result1$distanceMatrix))
+# patients[,2] <- result1$group
+# # > head(patients)
+# # patient_id        group
+# # [1,] "TCGA.CS.4938.01" "2"
+# # [2,] "TCGA.CS.4941.01" "2"
+# # [3,] "TCGA.CS.4942.01" "2"
+# # [4,] "TCGA.CS.4943.01" "2"
+# # [5,] "TCGA.CS.4944.01" "2"
+# # [6,] "TCGA.CS.5390.01" "2"
+
+# new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+# new_dat <- new_dat %>% dplyr::select(group, everything())
+# new_dat <- new_dat[order(new_dat$group),]
+# # > new_dat[1:4,1:5]
+# # group      patient_id Cancer_type   Type    ADAM10
+# # 7      1 TCGA.CS.5393.01         LGG Tumour 0.8411652
+# # 8      1 TCGA.CS.5394.01         LGG Tumour 1.0374810
+# # 9      1 TCGA.CS.5395.01         LGG Tumour 0.4455639
+# # 15     1 TCGA.CS.6667.01         LGG Tumour 0.1035104
+# # > nrow(new_dat)
+# # [1] 348
+# # > ncol(new_dat)
+# # [1] 34
+
+# format the data
+# dat <- new_dat
+dat <- my_data
+dat <- dat[,-c(1,2,3)]
+dat <- t(dat)
+colnames(dat) <- paste(my_data[,1], "_", my_data[,3], sep = "")
+
+# For copper genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% upGeneList),]
+rr <- rbind(rr, r[which(row.names(r) %in% downGeneList),])
+nTumour <- nrow(my_data[which(my_data$Type == "Tumour"),])
+nNormal <- nrow(my_data[which(my_data$Type == "Normal"),])
+tmp <- rr
+rr <- tmp[,(nTumour+1):(nTumour + nNormal)]
+rr <- cbind(rr, tmp[,1:nTumour])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmapAll.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, length(upGeneList)), rep(2,length(downGeneList)))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nNormal), rep(2,nTumour))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#---------------------------------------
+
+#---------------------------------------
+# For up genes, for 2 groups
+
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type        ALB     ATP7A       CASP3
+# TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519  1.10979667
+# TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239 -0.67663103
+# TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562  0.01558295
+# TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199  0.79229205
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 15
+my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type        ALB     ATP7A
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199
+# > nrow(my_data)
+# [1] 348
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+load(paste(outDir, "/", cancertype, "_surUp.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "1"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "1"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "1"
+# [6,] "TCGA.CS.5390.01" "1"
+
+new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+new_dat <- new_dat %>% dplyr::select(group, everything())
+new_dat <- new_dat[order(new_dat$group),]
+# > new_dat[1:4,1:5]
+# group      patient_id Cancer_type   Type        ALB
+# 1     1 TCGA.CS.4938.01         LGG Tumour -0.2547535
+# 3     1 TCGA.CS.4942.01         LGG Tumour -1.2115040
+# 5     1 TCGA.CS.4944.01         LGG Tumour -2.2555637
+# 6     1 TCGA.CS.5390.01         LGG Tumour -0.9262113
+# > nrow(new_dat)
+# [1] 348
+# > ncol(new_dat)
+# [1] 17
+
+# format the data
+dat <- new_dat
+# dat <- my_data
+dat <- dat[,-c(1,2,3,4)]
+colnames(dat) <- gsub("[.]","-",colnames(dat))
+dat <- dat[, which(colnames(dat) %in% upGeneList)]
+dat <- t(dat)
+colnames(dat) <- paste(new_dat[,2], "_", new_dat[,1], sep = "")
+# > dat[1:5,1:4]
+# TCGA.CS.4938.01_1 TCGA.CS.4942.01_1 TCGA.CS.4944.01_1 TCGA.CS.5390.01_1
+# ATP7A       -0.35641294         0.6141353        -0.9737546       0.764118396
+# CASP3        0.02466847         0.2716916        -0.5768917      -0.009506082
+# CDK1        -0.57554250         0.6503801        -1.7241047       1.358908879
+# CP           1.07210424         0.4782524         1.7397376      -0.020783054
+# F5           0.77685844         1.5402846         2.3243897       0.669144920
+# > nrow(dat)
+# [1] 8
+# > ncol(dat)
+# [1] 348
+
+# For up genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% upGeneList),]
+#rr <- rbind(rr, r[which(row.names(r) %in% geneList12),])
+nGroup1 <- nrow(patients[which(patients[,2] == 1),])
+nGroup2 <- nrow(patients[which(patients[,2] == 2),])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmapUpGenes.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, nrow(dat)))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nGroup1), rep(2,nGroup2))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For down genes, for 2 groups
+
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type        ALB     ATP7A       CASP3
+# TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519  1.10979667
+# TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239 -0.67663103
+# TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562  0.01558295
+# TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199  0.79229205
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 15
+my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type        ALB     ATP7A
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199
+# > nrow(my_data)
+# [1] 348
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+load(paste(outDir, "/", cancertype, "_surDown.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "2"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "2"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "2"
+# [6,] "TCGA.CS.5390.01" "2"
+
+new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+new_dat <- new_dat %>% dplyr::select(group, everything())
+new_dat <- new_dat[order(new_dat$group),]
+# > new_dat[1:4,1:5]
+# group      patient_id Cancer_type   Type         ALB
+# 10     1 TCGA.CS.5396.01         LGG Tumour -1.51012541
+# 11     1 TCGA.CS.5397.01         LGG Tumour -1.30781119
+# 17     1 TCGA.CS.6669.01         LGG Tumour -0.73239273
+# 18     1 TCGA.CS.6670.01         LGG Tumour  0.05036363
+# > nrow(new_dat)
+# [1] 348
+# > ncol(new_dat)
+# [1] 17
+
+# format the data
+dat <- new_dat
+# dat <- my_data
+dat <- dat[,-c(1,2,3,4)]
+colnames(dat) <- gsub("[.]","-",colnames(dat))
+dat <- dat[, which(colnames(dat) %in% downGeneList)]
+dat <- t(dat)
+colnames(dat) <- paste(new_dat[,2], "_", new_dat[,1], sep = "")
+# > dat[1:5,1:4]
+# TCGA.CS.5396.01_1 TCGA.CS.5397.01_1 TCGA.CS.6669.01_1
+# ALB            -1.51012541        -1.3078112        -0.7323927
+# CYP1A1          0.82362199         0.3998401         1.4873848
+# MAP1LC3A       -1.55906945         0.6137549         1.3166676
+# MT-CO1         -1.16969309        -0.5808168         1.3172970
+# SNCA            0.01020726         0.7913414         1.7795062
+# TCGA.CS.6670.01_1
+# ALB             0.05036363
+# CYP1A1          0.62906979
+# MAP1LC3A        0.09987831
+# MT-CO1          0.75338201
+# SNCA            0.26303082
+# > nrow(dat)
+# [1] 5
+# > ncol(dat)
+# [1] 348
+
+# For down genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% downGeneList),]
+#rr <- rbind(rr, r[which(row.names(r) %in% geneList12),])
+nGroup1 <- nrow(patients[which(patients[,2] == 1),])
+nGroup2 <- nrow(patients[which(patients[,2] == 2),])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmapDownGenes.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, nrow(dat)))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nGroup1), rep(2,nGroup2))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#---------------------------------------
+
+#---------------------------------------
+# For up & down genes, for 2 groups
+
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/", cancertype, "_dataForHeatmap.rds", sep = ""))
+# > my_data[1:4,1:5]
+# Cancer_type   Type        ALB     ATP7A       CASP3
+# TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519  1.10979667
+# TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239 -0.67663103
+# TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562  0.01558295
+# TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199  0.79229205
+# > nrow(my_data)
+# [1] 453
+# > ncol(my_data)
+# [1] 15
+my_data <- my_data[which(my_data$Type == "Tumour"),]
+my_data$patient_id <- rownames(my_data)
+my_data <- my_data %>% dplyr::select(patient_id, everything())
+# > my_data[1:4,1:5]
+# patient_id Cancer_type   Type        ALB     ATP7A
+# TCGA.S9.A7J2.01 TCGA.S9.A7J2.01         LGG Tumour  0.2196381 0.2057519
+# TCGA.DU.7302.01 TCGA.DU.7302.01         LGG Tumour -0.4343060 0.8561239
+# TCGA.P5.A5EX.01 TCGA.P5.A5EX.01         LGG Tumour  0.4626852 0.7158562
+# TCGA.HT.8563.01 TCGA.HT.8563.01         LGG Tumour -0.8185620 2.7716199
+# > nrow(my_data)
+# [1] 348
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+load(paste(outDir, "/", cancertype, "_sur.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "1"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "1"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "1"
+# [6,] "TCGA.CS.5390.01" "2"
+
+new_dat <- merge(my_data, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+new_dat <- new_dat %>% dplyr::select(group, everything())
+new_dat <- new_dat[order(new_dat$group),]
+# > new_dat[1:4,1:5]
+# group      patient_id Cancer_type   Type        ALB
+# 1      1 TCGA.CS.4938.01         LGG Tumour -0.2547535
+# 3      1 TCGA.CS.4942.01         LGG Tumour -1.2115040
+# 5      1 TCGA.CS.4944.01         LGG Tumour -2.2555637
+# 10     1 TCGA.CS.5396.01         LGG Tumour -1.5101254
+# > nrow(new_dat)
+# [1] 348
+# > ncol(new_dat)
+# [1] 17
+
+# format the data
+dat <- new_dat
+# dat <- my_data
+dat <- dat[,-c(1,2,3,4)]
+colnames(dat) <- gsub("[.]","-",colnames(dat))
+# dat <- dat[, which(colnames(dat) %in% downGeneList)]
+dat <- t(dat)
+colnames(dat) <- paste(new_dat[,2], "_", new_dat[,1], sep = "")
+# > dat[1:5,1:4]
+# TCGA.CS.4938.01_1 TCGA.CS.4942.01_1 TCGA.CS.4944.01_1 TCGA.CS.5396.01_1
+# ALB         -0.25475346        -1.2115040        -2.2555637       -1.51012541
+# ATP7A       -0.35641294         0.6141353        -0.9737546        1.56190764
+# CASP3        0.02466847         0.2716916        -0.5768917       -0.21182110
+# CDK1        -0.57554250         0.6503801        -1.7241047        0.69373930
+# CP           1.07210424         0.4782524         1.7397376        0.02692021
+# > nrow(dat)
+# [1] 13
+# > ncol(dat)
+# [1] 348
+
+# For up & down genes
+r <- dat
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% upGeneList),]
+rr <- rbind(rr, r[which(row.names(r) %in% downGeneList),])
+nGroup1 <- nrow(patients[which(patients[,2] == 1),])
+nGroup2 <- nrow(patients[which(patients[,2] == 2),])
+# draw
+f <- paste(outDir, "/", cancertype, "_heatmapUpDownGenes.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+my_group <- c(rep(1, length(upGeneList)), rep(2, length(downGeneList)))
+# my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, nGroup1), rep(2,nGroup2))
+# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#---------------------------------------
+
+#================================================================
+
+#================================================================
+# (25) Umap for tumour classification, using 18 genes and 12 genes for each cancer type, and pan-cancer
+# Run in server
+#================================================================
+
+# Function to plot umap
+plot.umap <- function(x, labels,
+         main="A UMAP visualization",
+         colors=c("#ff7f00", "#e377c2", "#17becf"),
+         pad=0.1, cex=0.6, pch=19, add=FALSE, legend.suffix="",
+         cex.main=1, cex.legend=0.85) {
+
+  layout <- x
+  if (is(x, "umap")) {
+    layout <- x$layout
+  }
+
+  xylim <- range(layout)
+  xylim <- xylim + ((xylim[2]-xylim[1])*pad)*c(-0.5, 0.5)
+  if (!add) {
+    par(mar=c(0.2,0.7,1.2,0.7), ps=10)
+    plot(xylim, xylim, type="n", axes=F, frame=F)
+    rect(xylim[1], xylim[1], xylim[2], xylim[2], border="#aaaaaa", lwd=0.25)
+  }
+  points(layout[,1], layout[,2], col=colors[as.integer(labels)],
+         cex=cex, pch=pch)
+  mtext(side=3, main, cex=cex.main)
+  
+  labels.u <- unique(labels)
+  legend.pos <- "topleft"
+  legend.text <- as.character(labels.u)
+  if (add) {
+    legend.pos <- "bottomleft"
+    legend.text <- paste(as.character(labels.u), legend.suffix)
+  }
+
+  legend(legend.pos, legend=legend.text, inset=0.03,
+         col=colors[as.integer(labels.u)],
+         bty="n", pch=pch, cex=cex.legend)
+}
+
+# load the data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+geneList18_12 <- c(geneList18, geneList12)
+
+#---------------------------------------
+# For 18 genes, for 2 groups, LGG
+
+cancertype <- "LGG"
+
+outDir <- paste(rootDir, "/Data/Output/surCancerType1812", sep = "")
+load(paste(outDir, "/", cancertype, "_sur18.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "2"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "2"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "2"
+# [6,] "TCGA.CS.5390.01" "2"
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+surdata <- surdata[which(surdata$cancertype == cancertype),]
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.CS.4938.01        LGG  0    3574 3.3219
+# TCGA.CS.4941.01        LGG  1     234 4.7549
+# TCGA.CS.4942.01        LGG  1    1335 3.5850
+# TCGA.CS.4943.01        LGG  1    1106 2.0000
+# TCGA.CS.4944.01        LGG  0    1828 3.3219
+# > nrow(surdata)
+# [1] 348
+# > ncol(surdata)
+# [1] 60
+
+# draw
+f <- paste(outDir, "/surCancerType1812/", cancertype, "_umap18genes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+# > x[1:4,1:5]
+# patient_id cancertype OS OS.time  AANAT
+# 1 TCGA.CS.4938.01        LGG  0    3574 3.3219
+# 2 TCGA.CS.4941.01        LGG  1     234 4.7549
+# 3 TCGA.CS.4942.01        LGG  1    1335 3.5850
+# 4 TCGA.CS.4943.01        LGG  1    1106 2.0000
+# > nrow(x)
+# [1] 348
+# > ncol(x)
+# [1] 62
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% geneList18)]
+# > dat[1:4,1:5]
+# ADAM10   AP1S1     APP    ARF1 ATP6AP1
+# 1 11.4615 10.9679 15.9837 13.8728 12.7946
+# 2 12.1633 11.8146 16.4526 14.6035 13.5169
+# 3 12.2938 12.0532 16.4958 14.1779 13.4029
+# 4 12.4757 11.6974 15.9645 14.2748 13.3393
+# > nrow(dat)
+# [1] 348
+# > ncol(dat)
+# [1] 18
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "2" "2" "2" "2" "2" "2"
+# > length(labels)
+# [1] 348
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of subtypes clustered using the 18 genes",
+          colors=c("#046C9A","#D69C4E"))
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For 12 genes, for 2 groups, LGG
+
+cancertype <- "LGG"
+
+outDir <- paste(rootDir, "/Data/Output/surCancerType1812", sep = "")
+load(paste(outDir, "/", cancertype, "_sur12.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+surdata <- surdata[which(surdata$cancertype == cancertype),]
+
+# draw
+f <- paste(outDir, "/surCancerType1812/", cancertype, "_umap12genes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% geneList12)]
+dat[1:4,1:5]
+nrow(dat)
+ncol(dat)
+# > dat[1:4,1:5]
+# AOC3    AQP1 CYP1A1 DBH     JUN
+# 1 5.5850 14.5588 3.3219   0 12.8684
+# 2 5.4263 18.1242 2.0000   3 13.9323
+# 3 4.8580 15.1665 6.4757   3 12.1267
+# 4 6.4746 12.8332 1.0000   2 13.3166
+# > nrow(dat)
+# [1] 348
+# > ncol(dat)
+# [1] 12
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "2" "1" "2" "2" "2" "2"
+# > length(labels)
+# [1] 348
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of subtypes clustered using the 12 genes",
+          colors=c("#046C9A","#D69C4E"))
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For 18 genes, for 2 groups, pan-cancer
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+load(paste(outDir, "/sur18.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.OR.A5J1.01" "1"
+# [2,] "TCGA.OR.A5J2.01" "1"
+# [3,] "TCGA.OR.A5J3.01" "1"
+# [4,] "TCGA.OR.A5J5.01" "1"
+# [5,] "TCGA.OR.A5J6.01" "1"
+# [6,] "TCGA.OR.A5J7.01" "1"
+# > nrow(patients)
+# [1] 6727
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+# draw
+f <- paste(outDir, "/umap18genes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+# > x[1:4,1:5]
+# patient_id cancertype OS OS.time  AANAT
+# 1 TCGA.02.0047.01        GBM  1     448 4.0000
+# 2 TCGA.02.0055.01        GBM  1      76 3.7004
+# 3 TCGA.02.2483.01        GBM  0     466 3.4594
+# 4 TCGA.02.2485.01        GBM  0     470 2.8074
+# > nrow(x)
+# [1] 6727
+# > ncol(x)
+# [1] 62
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% geneList18)]
+# > dat[1:4,1:5]
+# ADAM10   AP1S1     APP    ARF1 ATP6AP1
+# 1 11.8017 10.9440 15.4466 13.5590 12.7785
+# 2 12.0382 11.3219 15.5397 14.6902 13.0848
+# 3 11.9363 12.1039 16.0381 14.5960 13.5075
+# 4 11.7627 11.4041 16.0160 13.7551 13.0755
+# > nrow(dat)
+# [1] 6727
+# > ncol(dat)
+# [1] 18
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "1" "1" "1" "1" "1" "1"
+# > length(labels)
+# [1] 6727
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of subtypes clustered using the 18 genes",
+          colors=c("#046C9A","#D69C4E"))
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For 12 genes, for 2 groups, pan-cancer
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+load(paste(outDir, "/sur12.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.OR.A5J1.01" "1"
+# [2,] "TCGA.OR.A5J2.01" "1"
+# [3,] "TCGA.OR.A5J3.01" "1"
+# [4,] "TCGA.OR.A5J5.01" "1"
+# [5,] "TCGA.OR.A5J6.01" "1"
+# [6,] "TCGA.OR.A5J7.01" "1"
+# > nrow(patients)
+# [1] 6727
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+# draw
+f <- paste(outDir, "/umap12genes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+# > x[1:4,1:5]
+# patient_id cancertype OS OS.time  AANAT
+# 1 TCGA.02.0047.01        GBM  1     448 4.0000
+# 2 TCGA.02.0055.01        GBM  1      76 3.7004
+# 3 TCGA.02.2483.01        GBM  0     466 3.4594
+# 4 TCGA.02.2485.01        GBM  0     470 2.8074
+# > nrow(x)
+# [1] 6727
+# > ncol(x)
+# [1] 62
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% geneList12)]
+# > dat[1:4,1:5]
+# AOC3    AQP1 CYP1A1    DBH     JUN
+# 1 7.4429 16.1987  1.000 3.5850 12.5985
+# 2 7.7071 11.2096  5.000 3.4594 14.0844
+# 3 7.1799 12.7667  3.000 3.8074 14.2015
+# 4 6.1293 16.6494  1.585 3.8074 14.9370
+# > nrow(dat)
+# [1] 6727
+# > ncol(dat)
+# [1] 12
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "1" "1" "1" "1" "1" "1"
+# > length(labels)
+# [1] 6727
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of subtypes clustered using the 12 genes",
+          colors=c("#046C9A","#D69C4E"))
+dev.off()
+
+#---------------------------------------
+
+#================================================================
+
+#================================================================
+# (26) Umap for tumour classification, using copper genes for each cancer type
+# Run in server
+#================================================================
+
+# Function to plot umap
+plot.umap <- function(x, labels,
+                      main="A UMAP visualization",
+                      colors=c("#ff7f00", "#e377c2", "#17becf"),
+                      pad=0.1, cex=0.6, pch=19, add=FALSE, legend.suffix="",
+                      cex.main=1, cex.legend=0.85) {
+  
+  layout <- x
+  if (is(x, "umap")) {
+    layout <- x$layout
+  }
+  
+  xylim <- range(layout)
+  xylim <- xylim + ((xylim[2]-xylim[1])*pad)*c(-0.5, 0.5)
+  if (!add) {
+    par(mar=c(0.2,0.7,1.2,0.7), ps=10)
+    plot(xylim, xylim, type="n", axes=F, frame=F)
+    rect(xylim[1], xylim[1], xylim[2], xylim[2], border="#aaaaaa", lwd=0.25)
+  }
+  points(layout[,1], layout[,2], col=colors[as.integer(labels)],
+         cex=cex, pch=pch)
+  mtext(side=3, main, cex=cex.main)
+  
+  labels.u <- unique(labels)
+  legend.pos <- "topleft"
+  legend.text <- as.character(labels.u)
+  if (add) {
+    legend.pos <- "bottomleft"
+    legend.text <- paste(as.character(labels.u), legend.suffix)
+  }
+  
+  legend(legend.pos, legend=legend.text, inset=0.03,
+         col=colors[as.integer(labels.u)],
+         bty="n", pch=pch, cex=cex.legend)
+}
+
+cancertype <- "LGG"
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+x <- read.csv(fileName)
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] %in% c("UP", "DOWN")),]$gene
+
+#---------------------------------------
+# For up genes, for 2 groups
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+load(paste(outDir, "/", cancertype, "_surUp.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "1"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "1"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "1"
+# [6,] "TCGA.CS.5390.01" "1"
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+surdata <- surdata[which(surdata$cancertype == cancertype),]
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.CS.4938.01        LGG  0    3574 3.3219
+# TCGA.CS.4941.01        LGG  1     234 4.7549
+# TCGA.CS.4942.01        LGG  1    1335 3.5850
+# TCGA.CS.4943.01        LGG  1    1106 2.0000
+# TCGA.CS.4944.01        LGG  0    1828 3.3219
+# > nrow(surdata)
+# [1] 348
+# > ncol(surdata)
+# [1] 60
+
+# draw
+f <- paste(outDir, "/surCancerTypeUseCopperGenes/", cancertype, "_umapUpgenes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+# > x[1:4,1:5]
+# patient_id cancertype OS OS.time  AANAT
+# 1 TCGA.CS.4938.01        LGG  0    3574 3.3219
+# 2 TCGA.CS.4941.01        LGG  1     234 4.7549
+# 3 TCGA.CS.4942.01        LGG  1    1335 3.5850
+# 4 TCGA.CS.4943.01        LGG  1    1106 2.0000
+# > nrow(x)
+# [1] 348
+# > ncol(x)
+# [1] 62
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% upGeneList)]
+dat[1:4,1:5]
+nrow(dat)
+ncol(dat)
+# > dat[1:4,1:5]
+# ATP7A   CASP3    CDK1      CP      F5
+# 1 8.4838 10.3608  6.3923 11.5159 10.0715
+# 2 9.1396 10.8556  9.0084 10.2872  8.8074
+# 3 9.3772 10.6027  8.9425 10.1364 12.2677
+# 4 9.5018 10.4798 12.3250  8.8437  9.6742
+# > nrow(dat)
+# [1] 348
+# > ncol(dat)
+# [1] 8
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "1" "2" "1" "2" "1" "1"
+# > length(labels)
+# [1] 348
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of clustered subtypes",
+          colors=c("#046C9A","#D69C4E"), pad=0.1)
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For down genes, for 2 groups
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+load(paste(outDir, "/", cancertype, "_surDown.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "2"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "2"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "2"
+# [6,] "TCGA.CS.5390.01" "2"
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+surdata <- surdata[which(surdata$cancertype == cancertype),]
+
+# draw
+f <- paste(outDir, "/surCancerTypeUseCopperGenes/", cancertype, "_umapDowngenes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% downGeneList)]
+dat[1:4,1:5]
+nrow(dat)
+ncol(dat)
+# > dat[1:4,1:5]
+# ALB CYP1A1 MAP1LC3A  MT-CO1    SNCA
+# 1 5.4263 3.3219  10.6839 20.6123  8.7616
+# 2 5.7808 2.0000  11.4057 19.1937 10.2193
+# 3 4.0875 6.4757  10.4888 19.3822  9.9159
+# 4 3.8074 1.0000   8.5038 19.0112  8.6330
+# > nrow(dat)
+# [1] 348
+# > ncol(dat)
+# [1] 5
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "2" "2" "2" "2" "2" "2"
+# > length(labels)
+# [1] 348
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of clustered subtypes",
+          colors=c("#046C9A","#D69C4E"), pad=0.1)
+dev.off()
+
+#---------------------------------------
+
+#---------------------------------------
+# For up & down genes, for 2 groups
+
+outDir <- paste(rootDir, "/Data/Output/surCancerTypeUseCopperGenes", sep = "")
+load(paste(outDir, "/", cancertype, "_sur.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.CS.4938.01" "1"
+# [2,] "TCGA.CS.4941.01" "2"
+# [3,] "TCGA.CS.4942.01" "1"
+# [4,] "TCGA.CS.4943.01" "2"
+# [5,] "TCGA.CS.4944.01" "1"
+# [6,] "TCGA.CS.5390.01" "2"
+
+# gene data
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+surdata <- surdata[which(surdata$cancertype == cancertype),]
+
+# draw
+f <- paste(outDir, "/surCancerTypeUseCopperGenes/", cancertype, "_umapUpDowngenes.pdf", sep = "")
+pdf(file = f, width = 5, height =  5)
+x <- surdata
+x$patient_id <- rownames(x)
+x <- merge(x, patients, by.x = "patient_id", by.y = "patient_id", all.x = TRUE)
+
+x <- x %>% dplyr::select(group, everything())
+dat <- x[,which(colnames(x) %in% geneList)]
+dat[1:4,1:5]
+nrow(dat)
+ncol(dat)
+# > dat[1:4,1:5]
+# ALB  ATP7A   CASP3    CDK1      CP
+# 1 5.4263 8.4838 10.3608  6.3923 11.5159
+# 2 5.7808 9.1396 10.8556  9.0084 10.2872
+# 3 4.0875 9.3772 10.6027  8.9425 10.1364
+# 4 3.8074 9.5018 10.4798 12.3250  8.8437
+# > nrow(dat)
+# [1] 348
+# > ncol(dat)
+# [1] 13
+labels <- x$group
+# labels <- paste("Subtype ", labels, sep = "")
+head(labels)
+length(labels)
+# > head(labels)
+# [1] "1" "2" "1" "2" "1" "2"
+# > length(labels)
+# [1] 348
+data <- as.matrix(dat)
+dat.umap <- umap(data)
+plot.umap(dat.umap, labels, main="A UMAP visualisation of clustered subtypes",
+          colors=c("#046C9A","#D69C4E"), pad=0.1)
+dev.off()
+
+#---------------------------------------
+
+#================================================================
+
+#================================================================
+# (27) Compare gene expression, copper genes, 18 & 12 genes, 23 cancer types, using count and cpm
+# heatmap for clustered groups in pan-cancer
+# identify subset of genes for tumour classification & survival analysis
+# run on server
+#================================================================
+
+# Link the files
+# Katana
+# cancertype="ACC"
+# ln -s /srv/scratch/z3538133/001pancancer/pan/data/$cancertype/gtex.$cancertype.raw.counts.RData /srv/scratch/z3538133/002NetworkAnalysis/Data/$cancertype/gtex.$cancertype.raw.counts.RData
+
+# # Get the necessary data
+# getHeatmapData=function(geneList) {
+#   subtypes <- PanCancerAtlas_subtypes()
+#   subtypes <- unique(subtypes$cancer.type)
+#   subtypes <- c(subtypes, "PAAD")
+#   subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+#   subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+#   n <- length(subtypes)
+#   Cancer_type <- c()
+#   Type <- c()
+#   Expression <- c()
+#   for (i in 1:n) {
+#     print(i)
+#     cancertype <- subtypes[i]
+#     outDir <- paste(rootDir, "/Data/", cancertype, sep = "")
+#     load(paste(outDir, "/gtex.", cancertype, ".raw.counts.RData", sep = "")) # return gtex.PAN.raw.counts, including both tumor and normal
+#     # # transform
+#     # dat <- gtex.PAN.raw.counts
+#     # rownames(dat) <- dat$gene
+#     # dat <- dat[,-1]
+#     # dat <- dat + 1
+#     # dat <- log(dat, base = 2)
+#     # iGenes <- which(rownames(dat) %in% geneList)
+#     # r <- str_detect(colnames(dat), "TCGA")
+#     # nTumor <- length(which(r == TRUE))
+#     # nNormal <- ncol(dat) - nTumor
+#     
+#     # compute logCPM
+#     dat <- gtex.PAN.raw.counts
+#     rownames(dat) <- dat$gene
+#     dat <- dat[,-1]
+#     # dat <- dat + 1
+#     logCPM <- cpm(dat, prior.count=2, log=TRUE)
+#     logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+#     dat <- logCPM
+#     iGenes <- which(rownames(dat) %in% geneList)
+#     r <- str_detect(colnames(dat), "TCGA")
+#     nTumor <- length(which(r == TRUE))
+#     nNormal <- ncol(dat) - nTumor
+#     
+#     # # Add * if being critical copper gene
+#     # outDir <- paste(rootDir, "/Data/Output", sep = "")
+#     # fileName<-paste(outDir, "/criticalCoperGenes.csv",sep="")
+#     # selectedCriticalCopperGenes <- read.csv(fileName)
+#     # if(selectedCriticalCopperGenes[which(selectedCriticalCopperGenes$gene == gene),cancertype] == 1){
+#     #   cancertype <- paste("*", cancertype, sep = "")
+#     # }
+#     
+#     Cancer_type <- c(Cancer_type, rep(cancertype, nTumor + nNormal))
+#     Type <- c(Type, rep(c("Tumour", "Normal"), times = c(nTumor, nNormal)))
+#     x <- dat[iGenes,]
+#     x <- t(x)
+#     # order by gene names
+#     x <- x[, order(colnames(x), decreasing = FALSE)]
+#     Expression <- rbind(Expression, x)
+#     
+#   }
+#   data=data.frame(Cancer_type, Type ,  Expression)
+#   
+#   return(data)
+# }
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+head(uni_gene)
+nrow(uni_gene)
+# nrow(uni_gene)
+# x
+# 1     CDK1
+# 2    AP1S1
+# 3    CASP3
+# 4 MAP1LC3A
+# 5     SNCA
+# 6  TMPRSS6
+# [1] 35
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+
+# 30 genes
+# list30 <- c(geneList18, geneList12)
+# cat(list30, sep = ",")
+# CDK1,AP1S1,CASP3,TMPRSS6,GSK3B,APP,COX17,XIAP,ARF1,GPC1,SORD,ATP7A,SP1,MT-CO1,SLC11A2,ATP6AP1,ADAM10,CP,MAP1LC3A,SNCA,MAPT,JUN,CYP1A1,AOC3,PRNP,DBH,S100A12,AQP1,MT1X,XAF1
+# > cat(geneList18, sep = ",")
+# CDK1,AP1S1,CASP3,TMPRSS6,GSK3B,APP,COX17,XIAP,ARF1,GPC1,SORD,ATP7A,SP1,MT-CO1,SLC11A2,ATP6AP1,ADAM10,CP
+#   > cat(geneList12, sep = ",")
+# MAP1LC3A,SNCA,MAPT,JUN,CYP1A1,AOC3,PRNP,DBH,S100A12,AQP1,MT1X,XAF1
+
+# Restore it under a different name
+my_data <- readRDS(paste(outDir, "/dataForHeatmap.rds", sep = ""))
+# > my_data[1:5, 1:6]
+# Cancer_type   Type     ADAM10       AOC3      AP1S1        APP
+# TCGA.OR.A5K3.01         ACC Tumour -0.7909516 -2.8371850 -0.2222094 -1.1530789
+# TCGA.OR.A5J2.01         ACC Tumour  1.4904894 -0.8957145  1.2599977  0.7926713
+# TCGA.OR.A5LN.01         ACC Tumour -0.9779454 -1.9035118 -1.0292136 -0.5072996
+# TCGA.OR.A5KY.01         ACC Tumour  0.3102540 -0.3041889  2.3457249  0.6445042
+# TCGA.OR.A5LG.01         ACC Tumour  0.7147539  0.5562921  0.6389964 -0.3637465
+# > nrow(my_data)
+# [1] 11329
+# > ncol(my_data)
+# [1] 32
+
+# Only get tumour data
+my_data <- my_data[which(my_data[,2] == "Tumour"),]
+nrow(my_data)
+# nrow(my_data)
+# [1] 6732
+
+# format the data
+dat <- my_data
+dat <- dat[,-c(1,2)] # remove columns of cancer type and type of normal or tumour
+dat <- t(dat)
+
+r <- dat
+
+# Divide by up genes and down genes
+# geneList18 <- gsub("[-]",".",geneList18)
+# geneList12 <- gsub("[-]",".",geneList12)
+rownames(r) <- gsub("[.]","-",rownames(r))
+rr <- r[which(row.names(r) %in% geneList18),]
+rr <- rbind(rr,r[which(row.names(r) %in% geneList12),])
+# > rr[1:4,1:5]
+# TCGA.OR.A5K3.01 TCGA.OR.A5J2.01 TCGA.OR.A5LN.01 TCGA.OR.A5KY.01
+# ADAM10      -0.7909516       1.4904894      -0.9779454       0.3102540
+# AP1S1       -0.2222094       1.2599977      -1.0292136       2.3457249
+# APP         -1.1530789       0.7926713      -0.5072996       0.6445042
+# ARF1        -0.5307502       1.1526288      -0.1879886       0.4796551
+# TCGA.OR.A5LG.01
+# ADAM10       0.7147539
+# AP1S1        0.6389964
+# APP         -0.3637465
+# ARF1         0.5872978
+ncol(rr)
+# > ncol(rr)
+# [1] 6732
+write.csv(rr, paste(outDir, "/rr_heatmap_pan_groups.csv", sep = ""), row.names=TRUE)
+
+#---------------------------------------
+# For 18 genes, for 2 groups, pan-cancer
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+load(paste(outDir, "/sur18.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.OR.A5J1.01" "1"
+# [2,] "TCGA.OR.A5J2.01" "1"
+# [3,] "TCGA.OR.A5J3.01" "1"
+# [4,] "TCGA.OR.A5J5.01" "1"
+# [5,] "TCGA.OR.A5J6.01" "1"
+# [6,] "TCGA.OR.A5J7.01" "1"
+# > nrow(patients)
+# [1] 6727
+
+# # gene data
+# outDir <- paste(rootDir, "/Data/Output", sep = "")
+# fileName<-paste(outDir, "/surdata.Rdata",sep="")
+# load(fileName) # return surdata
+# surdata[1:5,1:4]
+# nrow(surdata)
+# ncol(surdata)
+# # > surdata[1:5,1:4]
+# # cancertype OS OS.time  AANAT
+# # TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# # TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# # TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# # TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# # TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# # > nrow(surdata)
+# # [1] 6727
+# # > ncol(surdata)
+# # [1] 60
+
+rr <- rr[which(row.names(rr) %in% geneList18),]
+r1 <- rr[,which(colnames(rr) %in% patients[which(patients[,2] == 1),1])]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% patients[which(patients[,2] == 2),1])])
+# > ncol(r1)
+# [1] 6537
+# > ncol(r2) - ncol(r1)
+# [1] 190
+
+# draw the chart
+f <- paste(outDir, "/heatmap18_pan.png", sep = "")
+png(file = f, width = 600, height =  600)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, 6537), rep(2,190))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% geneList18)]
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10     AP1S1      APP     ARF1  ATP6AP1
+# TCGA.OR.A5J1.01 3600.0469  1621.036 51686.50 24648.29 11853.29
+# TCGA.OR.A5J2.01 6566.9147  6434.891 94668.71 48466.49 16760.76
+# TCGA.OR.A5J3.01 1924.9430 11879.611 75783.70 18333.57 16463.69
+# TCGA.OR.A5J5.01  946.9865  2803.085 23731.24 20122.19  8097.72
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 18
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+# > dat[1:4,1:5]
+# TCGA.OR.A5J1.01 TCGA.OR.A5J2.01 TCGA.OR.A5J3.01 TCGA.OR.A5J5.01 TCGA.OR.A5J6.01
+# ADAM10       -2.175977     -0.90739836     -1.98254127       -4.269179      -1.5033557
+# AP1S1        -1.896608      0.09502618      1.07297573       -1.814749      -0.3233564
+# APP          -1.109462     -0.12276656     -0.05020926       -2.235250      -1.0692236
+# ARF1         -1.853613     -0.35860223     -1.21688994       -2.717414      -1.4324985
+# > nrow(dat)
+# [1] 18
+# > ncol(dat)
+# [1] 6727
+
+rr <- dat
+r1 <- rr[,which(colnames(rr) %in% patients[which(patients[,2] == 1),1])]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% patients[which(patients[,2] == 2),1])])
+# > ncol(r1)
+# [1] 6537
+# > ncol(r2) - ncol(r1)
+# [1] 190
+
+# draw the chart
+f <- paste(outDir, "/heatmap18_pan.png", sep = "")
+png(file = f, width = 600, height =  600)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 18))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, 6537), rep(2,190))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#-----------------------------------------
+
+#---------------------------------------
+# For 12 genes, for 2 groups, pan-cancer
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+rr <- read.csv(paste(outDir, "/rr_heatmap_pan_groups.csv", sep = ""), row.names = 1)
+
+load(paste(outDir, "/sur12.Rdata", sep = "")) # return result1
+
+patients <- matrix(NA, nrow = nrow(result1$distanceMatrix), ncol = 2)
+colnames(patients) <- c("patient_id", "group")
+patients[,1] <- as.character(colnames(result1$distanceMatrix))
+patients[,2] <- result1$group
+# > head(patients)
+# patient_id        group
+# [1,] "TCGA.OR.A5J1.01" "1"
+# [2,] "TCGA.OR.A5J2.01" "1"
+# [3,] "TCGA.OR.A5J3.01" "1"
+# [4,] "TCGA.OR.A5J5.01" "1"
+# [5,] "TCGA.OR.A5J6.01" "1"
+# [6,] "TCGA.OR.A5J7.01" "1"
+# > nrow(patients)
+# [1] 6727
+
+rr <- rr[which(row.names(rr) %in% geneList12),]
+r1 <- rr[,which(colnames(rr) %in% patients[which(patients[,2] == 1),1])]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% patients[which(patients[,2] == 2),1])])
+# > ncol(r1)
+# [1] 6553
+# > ncol(r2) - ncol(r1)
+# [1] 174
+
+# draw the chart
+f <- paste(outDir, "/heatmap12_pan.png", sep = "")
+png(file = f, width = 600, height =  600)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 12))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, 6553), rep(2,174))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+#ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% geneList12)]
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# AOC3      AQP1    CYP1A1 DBH      JUN
+# TCGA.OR.A5J1.01  260.9989 1575.3973  3.000078   1 5587.937
+# TCGA.OR.A5J2.01 1273.9562 2840.6394 17.999688   8 4454.970
+# TCGA.OR.A5J3.01  625.8617  440.9893  8.999844   4 4414.089
+# TCGA.OR.A5J5.01  528.6247  576.9890 16.000000   1 3019.094
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 12
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+# > dat[1:4,1:5]
+# TCGA.OR.A5J1.01 TCGA.OR.A5J2.01 TCGA.OR.A5J3.01 TCGA.OR.A5J5.01
+# AOC3         -0.665191      0.82017115       0.1657128       0.2340588
+# AQP1         -1.000626      0.08404926      -1.8267162      -1.3414037
+# CYP1A1       -0.374508      0.89360805       0.3588996       0.8334210
+# DBH          -1.199724      0.03423468      -0.4766345      -0.9840322
+# TCGA.OR.A5J6.01
+# AOC3         1.4112064
+# AQP1         0.3413380
+# CYP1A1       0.2164131
+# DBH         -0.5964999
+# > nrow(dat)
+# [1] 12
+# > ncol(dat)
+# [1] 6727
+
+rr <- dat
+r1 <- rr[,which(colnames(rr) %in% patients[which(patients[,2] == 1),1])]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% patients[which(patients[,2] == 2),1])])
+# > ncol(r1)
+# [1] 6553
+# > ncol(r2) - ncol(r1)
+# [1] 174
+
+# draw the chart
+f <- paste(outDir, "/heatmap12_pan.png", sep = "")
+png(file = f, width = 600, height =  600)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 12))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+my_group2 <- c(rep(1, 6553), rep(2,174))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#-----------------------------------------
+
+#---------------------------------------
+#------------------------------------
+# For 2 groups only
+#------------------------------------
+# For 30 genes, identify 2 groups up & down, pan-cancer
+# Top5, including both up and down
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# the cases of 30 genes, including 18 genes and 12 genes, for both up and down genes
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# [1] 6727
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273
+# ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP
+# 13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188
+# MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2
+# 3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+# gene_set <- c("ATP7A", "CP", "APP", "MAPT", "DBH", "TMPRSS6", "AOC3", "ADAM10", "SP1", "XIAP")
+# gene_set <- c("CDK1", "AP1S1", "CASP3")
+# gene_set <- y_plus[which(y_plus$UpDown == "Up" & y_plus$percent >= 1),]$gene
+gene_set <- y_plus[which(y_plus$frequency > 7),]$gene # top 5
+# > gene_set
+# [1] "CDK1"     "AP1S1"    "CASP3"    "MAP1LC3A" "SNCA"      
+# > result_list[[3]]$gene
+# [1] "AP1S1"
+# "CDK1"     "AP1S1"    "CASP3" high & "MAP1LC3A" "SNCA" low
+res_high <- result_list[[3]]$high # index 3 for AP1S1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    if(result_list[[i]]$gene %in% c("CDK1",     "AP1S1",    "CASP3")) {
+      res_high <- intersect(res_high, result_list[[i]]$high)  
+    } else {
+      res_high <- intersect(res_high, result_list[[i]]$low)
+    }
+    print(length(res_high))
+  }
+}
+# [1] 2283
+# [1] 1620
+# [1] 1177
+# [1] 493
+# [1] 390
+
+# "CDK1"     "AP1S1"    "CASP3" low and "MAP1LC3A" "SNCA" high
+# > result_list[[18]]$gene
+# [1] "MAP1LC3A"
+res_low <- result_list[[18]]$high # index 18 for MAP1LC3A
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    if(result_list[[i]]$gene %in% c( "CDK1",     "AP1S1",    "CASP3")) {
+      res_low <- intersect(res_low, result_list[[i]]$low)  
+    } else {
+      res_low <- intersect(res_low, result_list[[i]]$high)
+    }
+      
+    print(length(res_low))
+  }
+}
+# [1] 868
+# [1] 655
+# [1] 568
+# [1] 568
+# [1] 138
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 3 genes high 2 genes low
+nrow(surdata[which(surdata$group == 2),]) # 3 genes low 2 genes high
+nrow(surdata[which(surdata$group == 3),]) # others
+# [1] 390
+# [1] 138
+# [1] 6199
+
+surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/sur_chart_3up2down.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+# > dat[1:4,1:5]
+# TCGA.OR.A5J1.01 TCGA.OR.A5J2.01 TCGA.OR.A5J3.01 TCGA.OR.A5J5.01
+# ADAM10       -2.146292     -0.85689015    -1.955022627       -4.266049
+# AOC3         -1.626252     -0.33319563    -0.592047968       -1.478044
+# AP1S1        -1.875117      0.15632713     1.147479061       -1.785834
+# APP          -1.084996     -0.07517397    -0.005885496       -2.231244
+# TCGA.OR.A5J6.01
+# ADAM10      -1.4791372
+# AOC3         0.9058438
+# AP1S1       -0.2858717
+# APP         -1.0562735
+# > nrow(dat)
+# [1] 30
+# > ncol(dat)
+# [1] 6727
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% gene_set),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+# > ncol(r1)
+# [1] 390
+# > ncol(r2) - ncol(r1)
+# [1] 138
+
+# draw the chart
+f <- paste(outDir, "/heatmap_3up2down.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 5))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 390), rep(2,138))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#------------------------------------
+
+#------------------------------------
+# For 3 groups
+#------------------------------------
+# For 30 genes, identify 2 groups up & down, pan-cancer
+# Top5, including both up and down
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# the cases of 30 genes, including 18 genes and 12 genes, for both up and down genes
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# [1] 6727
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+# gene_set <- c("ATP7A", "CP", "APP", "MAPT", "DBH", "TMPRSS6", "AOC3", "ADAM10", "SP1", "XIAP")
+# gene_set <- c("CDK1", "AP1S1", "CASP3")
+# gene_set <- y_plus[which(y_plus$UpDown == "Up" & y_plus$percent >= 1),]$gene
+gene_set <- y_plus[which(y_plus$frequency > 7),]$gene # top 5
+# > gene_set
+# [1] "CDK1"     "AP1S1"    "CASP3"    "MAP1LC3A" "SNCA"      
+# > result_list[[3]]$gene
+# [1] "AP1S1"
+# "CDK1"     "AP1S1"    "CASP3" high & "MAP1LC3A" "SNCA" low
+res_high <- result_list[[3]]$high # index 3 for AP1S1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    if(result_list[[i]]$gene %in% c("CDK1",     "AP1S1",    "CASP3")) {
+      res_high <- intersect(res_high, result_list[[i]]$high)  
+    } else {
+      res_high <- intersect(res_high, result_list[[i]]$low)
+    }
+    print(length(res_high))
+  }
+}
+# [1] 2283
+# [1] 1620
+# [1] 1177
+# [1] 493
+# [1] 390
+
+# "CDK1"     "AP1S1"    "CASP3" low and "MAP1LC3A" "SNCA" high
+# > result_list[[18]]$gene
+# [1] "MAP1LC3A"
+res_low <- result_list[[18]]$high # index 18 for MAP1LC3A
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    if(result_list[[i]]$gene %in% c( "CDK1",     "AP1S1",    "CASP3")) {
+      res_low <- intersect(res_low, result_list[[i]]$low)  
+    } else {
+      res_low <- intersect(res_low, result_list[[i]]$high)
+    }
+    
+    print(length(res_low))
+  }
+}
+# [1] 868
+# [1] 655
+# [1] 568
+# [1] 568
+# [1] 138
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 3 genes high 2 genes low
+nrow(surdata[which(surdata$group == 2),]) # 3 genes low 2 genes high
+nrow(surdata[which(surdata$group == 3),]) # others
+# [1] 390
+# [1] 138
+# [1] 6199
+
+# surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/sur_chart_3up2down_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% gene_set),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+ncol(r1)
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r2) - ncol(r1)
+r3 <- cbind(r2, rr[,which(!(colnames(rr) %in% c(res_high,res_low)))])
+ncol(r3) - ncol(r2)
+r2 <- r3
+# [1] 390
+# [1] 138
+# [1] 6199
+
+# draw the chart
+f <- paste(outDir, "/heatmap_3up2down_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 5))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 390), rep(2,138), rep(3,6199))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+#----------------------------
+# check cancer types
+# group 1
+g1 <- surdata[which(row.names(surdata) %in% res_high),]
+nrow(g1)
+table(g1$cancertype)
+# nrow(g1)
+# table(g1$cancertype)
+# [1] 390
+# 
+# ACC BLCA BRCA COAD ESCA  GBM KIRC KIRP  LGG LIHC LUAD LUSC OVCA PAAD SKCM STAD
+# 1   32  162   73    6    3    2    2    2    6   39   28    6    4    2    7
+# UCEC  UCS
+# 13    2
+
+# group 2
+g2 <- surdata[which(row.names(surdata) %in% res_low),]
+nrow(g2)
+table(g2$cancertype)
+# nrow(g2)
+# table(g2$cancertype)
+# [1] 138
+# 
+# GBM KICH  LGG LUAD OVCA PAAD PCPG PRAD SKCM THCA UCEC
+# 7    2   56    1    3    1   24   23    9    8    4
+
+# group 3
+g3 <- surdata[which(!(colnames(rr) %in% c(res_high,res_low))),]
+nrow(g3)
+table(g3$cancertype)
+# [1] 6199
+# 
+# ACC  AML BLCA BRCA COAD ESCA  GBM KICH KIRC KIRP  LGG LIHC LUAD LUSC OVCA PAAD
+# 75  172  112 1049  204  173  155   89  506  187  290  233  234  164  409  148
+# PCPG PRAD SKCM STAD THCA UCEC  UCS
+# 155  350  320  402  552  165   55
+# [1] 6199
+
+#------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#------------------------------------
+# 3 up
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+# gene_set <- c("ATP7A", "CP", "APP", "MAPT", "DBH", "TMPRSS6", "AOC3", "ADAM10", "SP1", "XIAP")
+# gene_set <- c("CDK1", "AP1S1", "CASP3")
+# gene_set <- y_plus[which(y_plus$UpDown == "Up" & y_plus$percent >= 1),]$gene
+# gene_set <- y_plus[which(y_plus$frequency > 7),]$gene # top 5
+gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set
+result_list[[3]]$gene
+# > gene_set
+# [1] "CDK1"  "AP1S1" "CASP3"
+# > result_list[[3]]$gene
+# [1] "AP1S1"
+# all genes up
+res_high <- result_list[[3]]$high
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    res_high <- intersect(res_high, result_list[[i]]$high)  
+    print(length(res_high))
+  }
+}
+# [1] 2283
+# [1] 1620
+# [1] 1177
+
+# genes low
+# > result_list[[3]]$gene
+# [1] "AP1S1"
+res_low <- result_list[[3]]$low # index 3 for AP1S1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    res_low <- intersect(res_low, result_list[[i]]$low)  
+    print(length(res_low))
+  }
+}
+# [1] 4444
+# [1] 3637
+# [1] 3296
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 3 genes up
+nrow(surdata[which(surdata$group == 2),]) # 3 genes down
+# > nrow(surdata[which(surdata$group == 1),]) # 3 genes up
+# [1] 1177
+# > nrow(surdata[which(surdata$group == 2),]) # 3 genes down
+# [1] 3296
+surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/sur_chart_3up.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% gene_set),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r1)
+ncol(r2) - ncol(r1)
+# > ncol(r1)
+# [1] 1177
+# > ncol(r2) - ncol(r1)
+# [1] 3296
+
+# draw the chart
+f <- paste(outDir, "/heatmap_3up.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 3))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 1177), rep(2,3296))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#------------------------------------
+# 2 down
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for down genes in 12 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+# gene_set <- c("ATP7A", "CP", "APP", "MAPT", "DBH", "TMPRSS6", "AOC3", "ADAM10", "SP1", "XIAP")
+# gene_set <- c("CDK1", "AP1S1", "CASP3")
+# gene_set <- y_plus[which(y_plus$UpDown == "Up" & y_plus$percent >= 1),]$gene
+# gene_set <- y_plus[which(y_plus$frequency > 7),]$gene # top 5
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Down"),]$gene
+gene_set
+result_list[[18]]$gene
+# > gene_set
+# [1] "MAP1LC3A" "SNCA"    
+# > result_list[[18]]$gene
+# [1] "MAP1LC3A"
+# all genes up
+res_high <- result_list[[18]]$high
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    res_high <- intersect(res_high, result_list[[i]]$high) 
+    print(length(res_high))
+  }
+}
+# [1] 2196
+# [1] 562
+
+# genes low
+# > result_list[[18]]$gene
+# [1] "MAP1LC3A"
+res_low <- result_list[[18]]$low
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% gene_set) {
+    res_low <- intersect(res_low, result_list[[i]]$low)  
+    print(length(res_low))
+  }
+}
+# [1] 4531
+# [1] 3993
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 3 genes up
+nrow(surdata[which(surdata$group == 2),]) # 3 genes down
+# > nrow(surdata[which(surdata$group == 1),]) # 3 genes up
+# [1] 562
+# > nrow(surdata[which(surdata$group == 2),]) # 3 genes down
+# [1] 3993
+surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/sur_chart_2down.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% gene_set),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r1)
+ncol(r2) - ncol(r1)
+# > ncol(r1)
+# [1] 562
+# > ncol(r2) - ncol(r1)
+# [1] 3993
+
+# draw the chart
+f <- paste(outDir, "/heatmap_2down.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 2))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 562), rep(2,3993))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#-----------------------------------------
+
+#================================================================
+
+#================================================================
+# (28) Process SNV data, evaluate SNVs
+# run on server
+#================================================================
+
+#-----------------------------------------
+# Process SNV data
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+subtypes
+# subtypes
+# [1] "ACC"  "AML"  "BLCA" "BRCA" "COAD" "ESCA" "GBM"  "KICH" "KIRC" "KIRP"
+# [11] "LGG"  "LIHC" "LUAD" "LUSC" "OVCA" "PAAD" "PCPG" "PRAD" "SKCM" "STAD"
+# [21] "THCA" "UCEC" "UCS"
+
+n <- length(subtypes)
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  
+  # load the data
+  fileName<-paste0(rootDir, "/Data/SNV/", cancertype, "_maf_data.IdTrans.tsv")
+  dat<-as.data.frame(fread(fileName))
+  # nrow(dat)
+  # dat[1:5,1:10]
+  # [1] 11867
+  # Center NCBI_Build Chromosome Start_Position End_Position Strand
+  # 1      .     GRCh37         10       88419681     88419681      +
+  #   2      .     GRCh37         12      133360652    133360652      +
+  #   3      .     GRCh37         12        9760409      9760409      +
+  #   4      .     GRCh37         14       21991730     21991730      +
+  #   5      .     GRCh37         15       40587141     40587141      +
+  #   Variant_Classification Variant_Type Reference_Allele Tumor_Seq_Allele1
+  # 1      Missense_Mutation          SNP                G                 G
+  # 2                 Intron          SNP                C                 C
+  # 3      Missense_Mutation          SNP                C                 C
+  # 4      Missense_Mutation          SNP                C                 C
+  # 5                 Silent          SNP                C                 C
+  
+  # > unique(dat$Variant_Classification)
+  # [1] "Missense_Mutation"      "Intron"                 "Silent"
+  # [4] "Frame_Shift_Del"        "3'UTR"                  "Splice_Site"
+  # [7] "Nonsense_Mutation"      "RNA"                    "5'UTR"
+  # [10] "Frame_Shift_Ins"        "In_Frame_Del"           "3'Flank"
+  # [13] "In_Frame_Ins"           "5'Flank"                "Nonstop_Mutation"
+  # [16] "Translation_Start_Site"
+  
+  # Only get seven types of mutation: Missense_Mutation, Nonsense_Mutation, Frame_Shift_Ins, 
+  # Splice_Site, Frame_Shift_Del, In_Frame_Del, and In_Frame_Ins. We call these types of mutations deleterious mutations.
+  dat <- dat[which(dat$Variant_Classification %in% c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Ins", 
+                                                     "Splice_Site", "Frame_Shift_Del", "In_Frame_Del", "In_Frame_Ins")),]
+  # > nrow(dat)
+  # unique(dat$Variant_Classification)
+  # [1] 7682
+  # [1] "Missense_Mutation" "Frame_Shift_Del"   "Splice_Site"
+  # [4] "Nonsense_Mutation" "Frame_Shift_Ins"   "In_Frame_Del"
+  # [7] "In_Frame_Ins"
+  
+  # > dat[1:5,38:43]
+  # t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count
+  # 1     143         133          10     140         140           0
+  # 3     279         166         113     187         186           0
+  # 4     101          54          47      79          78           1
+  # 6     191         121          70     113         113           0
+  # 7     168         122          45     113         112           0
+  
+  dat$VAF <- dat$t_alt_count/dat$t_depth
+  # dat[1:5,c(38:43,118)]
+  # t_depth t_ref_count t_alt_count n_depth n_ref_count n_alt_count        VAF
+  # 1     143         133          10     140         140           0 0.06993007
+  # 3     279         166         113     187         186           0 0.40501792
+  # 4     101          54          47      79          78           1 0.46534653
+  # 6     191         121          70     113         113           0 0.36649215
+  # 7     168         122          45     113         112           0 0.26785714
+  
+  dat <- dat[which(dat$FILTER == "PASS"),]
+  
+  fwrite(dat, paste0(outDir, "/SNV/", cancertype, "_maf_data.IdTrans.deleterious.csv"))
+}
+
+#-----------------------------------------
+# Evaluate SNVs
+# Remember to remove SNVs with VAF < 0.05
+
+threshold <- 0.05
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Get 30 genes
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+head(uni_gene)
+nrow(uni_gene)
+# nrow(uni_gene)
+# x
+# 1     CDK1
+# 2    AP1S1
+# 3    CASP3
+# 4 MAP1LC3A
+# 5     SNCA
+# 6  TMPRSS6
+# [1] 35
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+
+geneList30 <- c(geneList18, geneList12)
+geneList30
+# [1] "CDK1"     "AP1S1"    "CASP3"    "TMPRSS6"  "GSK3B"    "APP"
+# [7] "COX17"    "XIAP"     "ARF1"     "GPC1"     "SORD"     "ATP7A"
+# [13] "SP1"      "MT-CO1"   "SLC11A2"  "ATP6AP1"  "ADAM10"   "CP"
+# [19] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [25] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Get sample size of cancer types
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+
+n <- length(subtypes)
+r <- matrix(NA, nrow = n, ncol = 2)
+colnames(r) <- c("cancer_type", "sample_size")
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  
+  # load the data
+  # for total number of samples
+  fileName<-paste0(rootDir, "/Data/SNV/", cancertype, "_maf_data.IdTrans.tsv")
+  dat<-as.data.frame(fread(fileName))
+  
+  r[i,1] <- cancertype
+  r[i,2] <- length(unique(dat$barcode16))
+  # r[i,2] <- length(unique(dat$Tumor_Sample_Barcode))
+
+}
+
+r <- as.data.frame(r)
+r[,2] <- as.numeric(r[,2])
+r
+# cancer_type sample_size
+# 1          ACC          92
+# 2          AML          85
+# 3         BLCA         411
+# 4         BRCA        1026
+# 5         COAD         407
+# 6         ESCA         185
+# 7          GBM         403
+# 8         KICH          66
+# 9         KIRC         370
+# 10        KIRP         282
+# 11         LGG         526
+# 12        LIHC         365
+# 13        LUAD         567
+# 14        LUSC         485
+# 15        OVCA         412
+# 16        PAAD         178
+# 17        PCPG         184
+# 18        PRAD         498
+# 19        SKCM         468
+# 20        STAD         439
+# 21        THCA         500
+# 22        UCEC         531
+# 23         UCS          57
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# draw heat map
+
+# geneList30
+
+# r
+r$type <- paste0(r$cancer_type, " (n=", r$sample_size, ")")
+
+nCancers <- nrow(r)
+nGenes <- length(geneList30)
+dat <- matrix(0, nrow = nGenes, ncol = nCancers)
+colnames(dat) <- r$type
+row.names(dat) <- geneList30
+for (i in 1:nCancers) {
+  cancertype <- r$cancer_type[i]
+  
+  # load the data
+  fileName<-paste0(outDir, "/SNV/", cancertype, "_maf_data.IdTrans.deleterious.csv")
+  mut<-as.data.frame(fread(fileName))
+  
+  mut <- mut[which(mut$VAF >= threshold),]
+  
+  for (j in 1:nGenes) {
+    gene <- geneList30[j]
+    dat[j, i] <- length(unique(mut[which(mut$Hugo_Symbol == gene),"barcode16"]))
+  }
+}
+
+dat2 <- melt(dat)
+dat2$percent <- dat2$value/parse_number(as.character(dat2$Var2)) 
+colnames(dat2) <- c("Gene", "Cancer_Type", "value", "Mutation_Frequency")
+dat2[which(dat2$value==0),"value"] <- ""
+
+# draw the chart
+f <- paste(outDir, "/SNV_heatmap.pdf", sep = "")
+pdf(file = f, width = 7, height =  7)
+ggplot(dat2, aes(Cancer_Type, Gene)) +
+  geom_tile(aes(fill = Mutation_Frequency)) +
+  geom_text(aes(label = value)) +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# get mutation data
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+
+SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+               "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+               "In_Frame_Ins")
+
+# geneList30
+
+# r - list of cancer types
+
+# get all mutation info
+n <- length(subtypes)
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  # Read data
+  dat <- as.data.frame(fread(paste0(outDir, "/SNV/", cancertype, "_maf_data.IdTrans.deleterious.csv")))
+  dat <- dat[which(dat$VAF >= threshold),]
+  # Only get necessary data
+  dat <- dat[,c("Variant_Classification", "Variant_Type", "Reference_Allele", "Tumor_Seq_Allele2", "Allele", "barcode16", "Hugo_Symbol")]
+  if(nrow(dat) > 0) {
+    dat$CancerType <- cancertype
+    if(i == 1) {
+      res <- dat
+    } else {
+      res <- rbind(res,dat)
+    }  
+  }
+}
+
+# Mutations for all genes
+saveRDS(res, paste0(outDir, "/SNV/SNVAllGenes_005.rds"))
+# res <- readRDS(paste0(outDir, "/SNV/SNVAllGenes_005.rds"))
+
+# 30 genes
+saveRDS(res[which(res$Hugo_Symbol %in% geneList30),], 
+        paste0(outDir, "/SNV/SNV30Genes_005.rds"))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Draw bar chart for Variant_Classification
+
+# data of 30 genes
+mut_30 <- readRDS(paste0(outDir, "/SNV/SNV30Genes_005.rds"))
+# > head(mut_30)
+# Variant_Classification Variant_Type Reference_Allele Tumor_Seq_Allele2
+# 374          Frame_Shift_Del          DEL                C                 -
+#   680        Missense_Mutation          SNP                G                 T
+# 5808         Frame_Shift_Del          DEL                G                 -
+#   5963       Missense_Mutation          SNP                C                 G
+# 6505       Missense_Mutation          SNP                G                 C
+# 12930      Missense_Mutation          SNP                C                 G
+# Allele        barcode16 Hugo_Symbol CancerType
+# 374        - TCGA-OR-A5J5-01A     TMPRSS6        ACC
+# 680        T TCGA-OR-A5J8-01A         DBH        ACC
+# 5808       - TCGA-OR-A5LJ-01A       AP1S1        ACC
+# 5963       G TCGA-OR-A5LL-01A          CP        ACC
+# 6505       C TCGA-P6-A5OH-01A       AP1S1        ACC
+# 12930      G TCGA-2F-A9KO-01A      CYP1A1       BLCA
+# > table(mut_30$Variant_Classification)
+# 
+# Frame_Shift_Del   Frame_Shift_Ins      In_Frame_Del      In_Frame_Ins
+# 113                23                11                 1
+# Missense_Mutation Nonsense_Mutation       Splice_Site
+# 1625               105                38
+
+variant_data <- as.data.frame(table(mut_30$Variant_Classification))
+variant_data <- variant_data[order(variant_data$Freq, decreasing = FALSE),]
+# > variant_data
+# Var1 Freq
+# 4      In_Frame_Ins    1
+# 3      In_Frame_Del   11
+# 2   Frame_Shift_Ins   23
+# 7       Splice_Site   38
+# 6 Nonsense_Mutation  105
+# 1   Frame_Shift_Del  113
+# 5 Missense_Mutation 1625
+
+# Specific color for each bar? Use a well known palette
+f <- paste(outDir, "/SNV_variant_classification.pdf", sep = "")
+pdf(file = f, width = 4, height =  4)
+# coul <- brewer.pal(7, "Set2") 
+# > coul
+# [1] "#66C2A5" "#FC8D62" "#8DA0CB" "#E78AC3" "#A6D854" "#FFD92F" "#E5C494"
+# adjust to the maximum of either the default 
+# or a figure based on the maximum length
+# coul <- c("brown", "yellow", "violet", "orange", "red", "blue", "green4")
+# mutType <- c("In_Frame_Ins", "In_Frame_Del", "Frame_Shift_Ins", "Splice_Site", "Nonsense_Mutation", "Frame_Shift_Del", "Missense_Mutation")
+coul <- c("brown", "yellow", "violet", "orange", "red", "blue", "green4")
+ylabels <- c("Missense_Mutation")
+par(mar=c(5.1, max(4.1,max(nchar(ylabels))/1.8) ,4.1 ,2.1))
+for (i in 1:nrow(variant_data)) {
+  if(variant_data$Var1[i] == "In_Frame_Ins") {
+    variant_data$Color[i] <- "brown"
+  } else if(variant_data$Var1[i] == "In_Frame_Del") {
+    variant_data$Color[i] <- "yellow"
+  } else if(variant_data$Var1[i] == "Frame_Shift_Ins") {
+    variant_data$Color[i] <- "violet"
+  } else if(variant_data$Var1[i] == "Splice_Site") {
+    variant_data$Color[i] <- "orange"
+  } else if(variant_data$Var1[i] == "Nonsense_Mutation") {
+    variant_data$Color[i] <- "red"
+  } else if(variant_data$Var1[i] == "Frame_Shift_Del") {
+    variant_data$Color[i] <- "blue"
+  } else if(variant_data$Var1[i] == "Missense_Mutation") {
+    variant_data$Color[i] <- "green4"
+  }
+}
+barplot(height=variant_data$Freq, names=variant_data$Var1, col=variant_data$Color, horiz=T, las=1, border=NA)
+dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Draw bar chart for top 10 genes
+
+# data of 30 genes
+mut_30 <- readRDS(paste0(outDir, "/SNV/SNV30Genes_005.rds"))
+# > head(mut_30)
+# Variant_Classification Variant_Type Reference_Allele Tumor_Seq_Allele2
+# 374          Frame_Shift_Del          DEL                C                 -
+#   680        Missense_Mutation          SNP                G                 T
+# 5808         Frame_Shift_Del          DEL                G                 -
+#   5963       Missense_Mutation          SNP                C                 G
+# 6505       Missense_Mutation          SNP                G                 C
+# 12930      Missense_Mutation          SNP                C                 G
+# Allele        barcode16 Hugo_Symbol CancerType
+# 374        - TCGA-OR-A5J5-01A     TMPRSS6        ACC
+# 680        T TCGA-OR-A5J8-01A         DBH        ACC
+# 5808       - TCGA-OR-A5LJ-01A       AP1S1        ACC
+# 5963       G TCGA-OR-A5LL-01A          CP        ACC
+# 6505       C TCGA-P6-A5OH-01A       AP1S1        ACC
+# 12930      G TCGA-2F-A9KO-01A      CYP1A1       BLCA
+
+gene_frq <- as.data.frame(table(mut_30$Hugo_Symbol))
+gene_frq <- gene_frq[order(gene_frq$Freq, decreasing = TRUE),]
+total_mut <- nrow(mut_30)
+# > total_mut
+# [1] 1916
+gene_frq$percent <- gene_frq$Freq/total_mut
+gene_frq$percent <- paste0(round(gene_frq$percent*100,0), "%")
+gene_frq <- gene_frq[1:10,]
+# Var1 Freq percent
+# 8    ATP7A  223     12%
+# 12      CP  159      8%
+# 19    MAPT  123      6%
+# 4      APP  122      6%
+# 27 TMPRSS6  112      6%
+# 14     DBH  108      6%
+# 1   ADAM10   98      5%
+# 2     AOC3   89      5%
+# 26     SP1   87      5%
+# 13  CYP1A1   75      4%
+
+SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+               "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+               "In_Frame_Ins")
+
+dat <- gene_frq
+# total_mut <- sum(dat$Freq)
+# dat$percent <- paste0(round((dat$Freq/total_mut)*100, 1), "%")
+dat$Missense_Mutation <- 0
+dat$Nonsense_Mutation <- 0
+dat$Frame_Shift_Del <- 0
+dat$Splice_Site <- 0
+dat$Frame_Shift_Ins <- 0
+dat$In_Frame_Del <- 0
+dat$In_Frame_Ins <- 0
+for (i in 1:10) {
+  mut <- mut_30[which(mut_30$Hugo_Symbol %in% dat$Var1[i]),]
+  n <- nrow(mut)
+  for (j in 1:n) {
+    if(mut$Variant_Classification[j] == "Missense_Mutation") {
+      dat$Missense_Mutation[i] <- dat$Missense_Mutation[i] + 1
+      
+    } else if(mut$Variant_Classification[j] == "Nonsense_Mutation") {
+      dat$Nonsense_Mutation[i] <- dat$Nonsense_Mutation[i] + 1
+      
+    } else if(mut$Variant_Classification[j] == "Frame_Shift_Del") {
+      dat$Frame_Shift_Del[i] <- dat$Frame_Shift_Del[i] + 1
+      
+    } else if(mut$Variant_Classification[j] == "Splice_Site") {
+      dat$Splice_Site[i] <- dat$Splice_Site[i] + 1
+      
+    } else if(mut$Variant_Classification[j] == "Frame_Shift_Ins") {
+      dat$Frame_Shift_Ins[i] <- dat$Frame_Shift_Ins[i] + 1
+      
+    } else if(mut$Variant_Classification[j] == "In_Frame_Del") {
+      dat$In_Frame_Del[i] <- dat$In_Frame_Del[i] + 1
+      
+    } else if(mut$Variant_Classification[j] == "In_Frame_Ins") {
+      dat$In_Frame_Ins[i] <- dat$In_Frame_Ins[i] + 1
+    }
+    
+  }
+}
+dat
+# dat
+# Var1 Freq percent Missense_Mutation Nonsense_Mutation Frame_Shift_Del
+# 8    ATP7A  223     12%               199                14               5
+# 12      CP  159      8%               126                 8              18
+# 19    MAPT  123      6%               105                 3              11
+# 4      APP  122      6%               105                 6               5
+# 27 TMPRSS6  112      6%               100                 4               6
+# 14     DBH  108      6%                97                 6               3
+# 1   ADAM10   98      5%                81                 4               8
+# 2     AOC3   89      5%                78                 2               6
+# 26     SP1   87      5%                73                 9               2
+# 13  CYP1A1   75      4%                66                 3               2
+# Splice_Site Frame_Shift_Ins In_Frame_Del In_Frame_Ins
+# 8            3               2            0            0
+# 12           5               1            1            0
+# 19           3               1            0            0
+# 4            4               1            1            0
+# 27           1               0            1            0
+# 14           2               0            0            0
+# 1            1               2            2            0
+# 2            0               3            0            0
+# 26           1               1            1            0
+# 13           1               2            0            1
+
+dat2 <- data.frame(Gene = rep(dat$Var1, 7), TotalNumMut = rep(dat$Freq, 7), Per = rep(dat$percent, 7), 
+                   MutType = c(rep(SNV_types[1], 10),
+                               rep(SNV_types[2], 10),
+                               rep(SNV_types[3], 10),
+                               rep(SNV_types[4], 10),
+                               rep(SNV_types[5], 10),
+                               rep(SNV_types[6], 10),
+                               rep(SNV_types[7], 10)),
+                   NumMut = c(dat$Missense_Mutation,
+                              dat$Nonsense_Mutation,
+                              dat$Frame_Shift_Del,
+                              dat$Splice_Site,
+                              dat$Frame_Shift_Ins,
+                              dat$In_Frame_Del,
+                              dat$In_Frame_Ins),
+                   Color = "")
+# for (i in 1:nrow(dat2)) {
+#   if(dat2$MutType[i] == "In_Frame_Ins") {
+#     dat2$Color[i] <- "#E5C494"
+#   } else if(dat2$MutType[i] == "In_Frame_Del") {
+#     dat2$Color[i] <- "#FFD92F"
+#   } else if(dat2$MutType[i] == "Frame_Shift_Ins") {
+#     dat2$Color[i] <- "#A6D854"
+#   } else if(dat2$MutType[i] == "Splice_Site") {
+#     dat2$Color[i] <- "#E78AC3"
+#   } else if(dat2$MutType[i] == "Nonsense_Mutation") {
+#     dat2$Color[i] <- "#8DA0CB"
+#   } else if(dat2$MutType[i] == "Frame_Shift_Del") {
+#     dat2$Color[i] <- "#FC8D62"
+#   } else if(dat2$MutType[i] == "Missense_Mutation") {
+#     dat2$Color[i] <- "#66C2A5"
+#   }
+# }
+# SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+#                "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+#                "In_Frame_Ins")
+# coul <- c("brown", "yellow", "violet", "orange", "red", "blue", "green4")
+# mutType <- c("In_Frame_Ins", "In_Frame_Del", "Frame_Shift_Ins", "Splice_Site", "Nonsense_Mutation", "Frame_Shift_Del", "Missense_Mutation")
+for (i in 1:nrow(dat2)) {
+  if(dat2$MutType[i] == "In_Frame_Ins") {
+    dat2$Color[i] <- "brown"
+  } else if(dat2$MutType[i] == "In_Frame_Del") {
+    dat2$Color[i] <- "yellow"
+  } else if(dat2$MutType[i] == "Frame_Shift_Ins") {
+    dat2$Color[i] <- "violet"
+  } else if(dat2$MutType[i] == "Splice_Site") {
+    dat2$Color[i] <- "orange"
+  } else if(dat2$MutType[i] == "Nonsense_Mutation") {
+    dat2$Color[i] <- "red"
+  } else if(dat2$MutType[i] == "Frame_Shift_Del") {
+    dat2$Color[i] <- "blue"
+  } else if(dat2$MutType[i] == "Missense_Mutation") {
+    dat2$Color[i] <- "green4"
+  }
+}
+save(dat2, file=paste0(outDir, 'dat2.RData'))
+# > head(dat2)
+# Gene TotalNumMut Per           MutType NumMut Color
+# 1   ATP7A         223 12% Missense_Mutation    199 green
+# 2      CP         159  8% Missense_Mutation    126 green
+# 3    MAPT         123  6% Missense_Mutation    105 green
+# 4     APP         122  6% Missense_Mutation    105 green
+# 5 TMPRSS6         112  6% Missense_Mutation    100 green
+# 6     DBH         108  6% Missense_Mutation     97 green
+
+# chart
+f <- paste(outDir, "/SNV_Top10Genes.pdf", sep = "")
+pdf(file = f, width = 4, height =  4)
+## set the levels in order we want
+
+load(paste0(outDir, 'dat2.RData'))
+# load("R:/TTRP/Vu/002NetworkAnalysis/Data/Output/dat2.RData")
+
+dat3 <- within(dat2, Gene <- factor(Gene, levels=c("CYP1A1", "SP1", "AOC3",
+                                                   "ADAM10", "DBH", "TMPRSS6",
+                                                   "APP", "MAPT", "CP", "ATP7A")))
+# dat3 <- within(dat3, MutType <- factor(MutType, levels=c("In_Frame_Ins", "In_Frame_Del", "Frame_Shift_Ins",
+#                                                          "Splice_Site", "Nonsense_Mutation", "Frame_Shift_Del", "Missense_Mutation")))
+dat3 <- within(dat3, MutType <- factor(MutType, levels=c("In_Frame_Ins", "Frame_Shift_Ins", "Splice_Site",
+                                                         "Nonsense_Mutation", "In_Frame_Del", "Missense_Mutation",
+                                                         "Frame_Shift_Del")))
+# par(mar=c(5.1, 4.1 ,4.1 ,4.1)) # bottom, left, top, and right. The default is c(5.1, 4.1, 4.1, 2.1)
+# coul <- c("brown", "yellow", "violet", "orange", "red", "blue", "green4")
+# mutType <- c("In_Frame_Ins", "In_Frame_Del", "Frame_Shift_Ins", "Splice_Site", "Nonsense_Mutation", "Frame_Shift_Del", "Missense_Mutation")
+lim <- c(0, sum(dat3[which(dat3$Gene == "ATP7A"),"NumMut"]) + 50)
+ggplot(aes(y=NumMut, x=Gene, fill = MutType), data = dat3) +
+  # geom_bar(stat = 'identity', position = "stack") +
+  geom_bar(stat = 'identity') +
+  scale_y_continuous(expand = c(0, 0), limits = lim) + 
+  geom_text(data = dat3[1:10,],
+            hjust = -0.5,
+            aes(x= Gene, y = TotalNumMut, label = Per),
+            inherit.aes = FALSE) +
+  coord_flip() +
+  scale_fill_manual('Variant Classification', values = c("In_Frame_Ins" = "brown", "In_Frame_Del" = "yellow", "Frame_Shift_Ins" = "violet",
+                                                         "Splice_Site" = "orange", "Nonsense_Mutation" = "red", "Frame_Shift_Del" = "blue",
+                                                         "Missense_Mutation" = "green4")) +
+  theme(axis.title.x=element_blank(),axis.title.y=element_blank(), legend.position="none")
+  # theme(plot.margin = margin(1,1,1.5,1.2, "cm"))
+dev.off()
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# water fall chart
+
+# Load the data and create maf file
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+
+SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+               "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+               "In_Frame_Ins")
+
+# 30 genes
+# geneList30
+
+# get all mutation info
+n <- length(subtypes)
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+threshold <- 0.05
+
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  # Read data
+  dat <- as.data.frame(fread(paste0(outDir, "/SNV/", cancertype, "_maf_data.IdTrans.deleterious.csv")))
+  dat <- dat[which(dat$VAF >= threshold),]
+  
+  # Get 30 genes
+  dat <- dat[which(dat$Hugo_Symbol %in% geneList30),]
+  
+  # Only get necessary data
+  
+  # Required columns: Hugo_Symbol	Entrez_Gene_Id	Center	NCBI_Build	Chromosome
+  # Start_Position	End_position	Strand	Variant_Classification	Variant_Type
+  # Reference_Allele	Tumor_Seq_Allele1	Tumor_Seq_Allele2	Tumor_Sample_Barcode	Protein_Change
+  # i_TumorVAF_WU	i_transcript_name
+  
+  # Note
+  # VAF, need to *100
+  # Use Transcript_ID instead of i_transcript_name
+  dat_mut <- dat[,c("Hugo_Symbol",	"entrez",	"Center",	"NCBI_Build",	"Chromosome",
+    "Start_Position",	"End_Position",	"Strand",	"Variant_Classification",	"Variant_Type",
+    "Reference_Allele",	"Tumor_Seq_Allele1",	"Tumor_Seq_Allele2",	"Tumor_Sample_Barcode",	"HGVSp_Short", 
+    "VAF",	"Transcript_ID")]
+  colnames(dat_mut) <- c("Hugo_Symbol",	"Entrez_Gene_Id",	"Center",	"NCBI_Build",	"Chromosome",
+                     "Start_Position",	"End_position",	"Strand",	"Variant_Classification",	"Variant_Type",
+                     "Reference_Allele",	"Tumor_Seq_Allele1",	"Tumor_Seq_Allele2",	"Tumor_Sample_Barcode",	"Protein_Change",
+                     "i_TumorVAF_WU",	"i_transcript_name")
+  dat_mut$i_TumorVAF_WU <- dat_mut$i_TumorVAF_WU*100
+  
+  dat_clinical <- dat[,c("Tumor_Sample_Barcode", "cancer_types")]
+  colnames(dat_clinical) <- c("Tumor_Sample_Barcode", "Cancer_Type")
+  
+  if(nrow(dat_mut) > 0) {
+    dat_clinical$Cancer_Type <- cancertype
+    if(i == 1) {
+      res_mut <- dat_mut
+      res_clinical <- dat_clinical
+    } else {
+      res_mut <- rbind(res_mut,dat_mut)
+      res_clinical <- rbind(res_clinical, dat_clinical)
+    }  
+  }
+}
+
+write.table(res_mut, paste0(outDir, "/pan_cancer_30genes.maf"), quote = FALSE, row.names = F, sep="\t")
+write.table(res_clinical, paste0(outDir, "/pan_cancer_annot_30genes.tsv"), quote = FALSE, row.names = F, sep="\t")
+
+# draw chart
+# f <- paste(outDir, "/SNV_Waterfall.pdf", sep = "")
+# pdf(file = f, width = 12, height =  12)
+f <- paste(outDir, "/SNV_Waterfall.png", sep = "")
+png(file = f, width = 900, height =  600)
+pan.maf <- paste0(outDir, "/pan_cancer_30genes.maf")
+pan.clin <- paste0(outDir, "/pan_cancer_annot_30genes.tsv")
+pan <- read.maf(maf = pan.maf, clinicalData = pan.clin)
+#Basic onocplot
+# oncoplot(maf = pan, top = 3)
+#Changing colors for variant classifications (You can use any colors, here in this example we will use a color palette from RColorBrewer)
+# for (i in 1:nrow(dat2)) {
+#   if(dat2$MutType[i] == "In_Frame_Ins") {
+#     dat2$Color[i] <- "#E5C494"
+#   } else if(dat2$MutType[i] == "In_Frame_Del") {
+#     dat2$Color[i] <- "#FFD92F"
+#   } else if(dat2$MutType[i] == "Frame_Shift_Ins") {
+#     dat2$Color[i] <- "#A6D854"
+#   } else if(dat2$MutType[i] == "Splice_Site") {
+#     dat2$Color[i] <- "#E78AC3"
+#   } else if(dat2$MutType[i] == "Nonsense_Mutation") {
+#     dat2$Color[i] <- "#8DA0CB"
+#   } else if(dat2$MutType[i] == "Frame_Shift_Del") {
+#     dat2$Color[i] <- "#FC8D62"
+#   } else if(dat2$MutType[i] == "Missense_Mutation") {
+#     dat2$Color[i] <- "#66C2A5"
+#   }
+# }
+# col = RColorBrewer::brewer.pal(n = 8, name = 'Paired')
+# names(col) = c('Frame_Shift_Del','Missense_Mutation', 'Nonsense_Mutation', 'Multi_Hit', 'Frame_Shift_Ins',
+#                'In_Frame_Ins', 'Splice_Site', 'In_Frame_Del')
+# coul <- c("brown", "yellow", "violet", "orange", "red", "blue", "green4")
+# mutType <- c("In_Frame_Ins", "In_Frame_Del", "Frame_Shift_Ins", "Splice_Site", "Nonsense_Mutation", "Frame_Shift_Del", "Missense_Mutation")
+col = c("brown", "yellow", "violet", "orange", "red", "blue", "green4", "black")
+names(col) = c("In_Frame_Ins", "In_Frame_Del", "Frame_Shift_Ins", "Splice_Site", "Nonsense_Mutation", "Frame_Shift_Del", "Missense_Mutation", "Multi-Hit")
+#Color coding for classification; try getAnnotations(x = pan) to see available annotations.
+# fabcolors = RColorBrewer::brewer.pal(n = 8,name = 'Spectral')
+mut_30 <- readRDS(paste0(outDir, "/SNV/SNV30Genes_005.rds"))
+length(unique(mut_30$CancerType))
+# length(unique(mut_30$CancerType))
+# [1] 22
+# > unique(mut_30$CancerType)
+# [1] "ACC"  "BLCA" "BRCA" "COAD" "ESCA" "GBM"  "KICH" "KIRC" "KIRP" "LGG"
+# [11] "LIHC" "LUAD" "LUSC" "OVCA" "PAAD" "PCPG" "PRAD" "SKCM" "STAD" "THCA"
+# [21] "UCEC" "UCS"
+fabcolors = c(RColorBrewer::brewer.pal(n = 12, name = 'Paired'),RColorBrewer::brewer.pal(n = 10, name = 'Set3'))
+names(fabcolors) = unique(mut_30$CancerType)
+fabcolors = list(Cancer_Type = fabcolors)
+oncoplot(maf = pan, colors = col, clinicalFeatures = 'Cancer_Type', annotationColor = fabcolors, top = 10, sepwd_samples = 0,
+         sortByAnnotation = TRUE,
+         groupAnnotationBySize = FALSE,
+         annotationOrder = NULL,
+         sortByMutation = FALSE)
+dev.off()
+
+# Check percentages
+# data of 30 genes
+mut_30 <- readRDS(paste0(outDir, "/SNV/SNV30Genes_005.rds"))
+
+gene_frq <- as.data.frame(table(mut_30$Hugo_Symbol))
+gene_frq <- gene_frq[order(gene_frq$Freq, decreasing = TRUE),]
+gene_frq <- gene_frq[1:10,]
+# > gene_frq
+# Var1 Freq
+# 8    ATP7A  223
+# 12      CP  159
+# 19    MAPT  123
+# 4      APP  122
+# 27 TMPRSS6  112
+# 14     DBH  108
+# 1   ADAM10   98
+# 2     AOC3   89
+# 26     SP1   87
+# 13  CYP1A1   75
+
+mut_10 <- mut_30[which(mut_30$Hugo_Symbol %in% gene_frq$Var1),]
+gene_frq$per <- 0
+for (i in 1:10) {
+  mut <- mut_10[which(mut_10$Hugo_Symbol == gene_frq$Var1[i]),]
+  gene_frq$per[i] <- round(length(unique(mut$barcode16))/length(unique(mut_30$barcode16))*100,0)
+}
+gene_frq
+# gene_frq
+# Var1 Freq per
+# 8    ATP7A  223  17
+# 12      CP  159  13
+# 19    MAPT  123  11
+# 4      APP  122  11
+# 27 TMPRSS6  112  10
+# 14     DBH  108  10
+# 1   ADAM10   98   9
+# 2     AOC3   89   8
+# 26     SP1   87   8
+# 13  CYP1A1   75   7
+
+#-----------------------------------------
+
+#================================================================
+
+#================================================================
+# (29) Check location of SNV, gene ATP7A
+# run on server
+#================================================================
+outDir <- paste0(rootDir, "/Data/Output")
+threshold <- 0.05
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# get mutation data with location
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+
+SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+               "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+               "In_Frame_Ins")
+
+# gene ATP7A
+gene <- "ATP7A"
+
+# get all mutation info
+n <- length(subtypes)
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  # Read data
+  dat <- as.data.frame(fread(paste0(outDir, "/SNV/", cancertype, "_maf_data.IdTrans.deleterious.csv")))
+  dat <- dat[which(dat$VAF >= threshold),]
+  # Only get necessary data
+  dat <- dat[,c("Variant_Classification", "Variant_Type", "Reference_Allele", "Tumor_Seq_Allele2", "Allele", "barcode16", "Hugo_Symbol",
+                "Chromosome", "Start_Position", "End_Position", "Exon_Number", "all_effects", "EXON", "INTRON", "IMPACT")]
+  if(nrow(dat) > 0) {
+    dat$CancerType <- cancertype
+    if(i == 1) {
+      res <- dat
+    } else {
+      res <- rbind(res,dat)
+    }  
+  }
+}
+
+# ATP7A
+saveRDS(res[which(res$Hugo_Symbol == gene),], 
+        paste0(outDir, "/SNV/SNVATP7A_005.rds"))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Draw bar chart for Variant_Classification
+
+# data of ATP7A
+mut_ATP7A <- readRDS(paste0(outDir, "/SNV/SNVATP7A_005.rds"))
+# > table(mut_ATP7A$Variant_Classification)
+# 
+# Frame_Shift_Del   Frame_Shift_Ins Missense_Mutation Nonsense_Mutation
+# 5                 2               199                14
+# Splice_Site
+# 3
+# > nrow(mut_ATP7A)
+# [1] 223
+
+variant_data <- as.data.frame(table(mut_ATP7A$Variant_Classification))
+variant_data <- variant_data[order(variant_data$Freq, decreasing = FALSE),]
+
+# Specific color for each bar? Use a well known palette
+f <- paste(outDir, "/SNV_variant_classification_ATP7A.pdf", sep = "")
+pdf(file = f, width = 4, height =  4)
+coul <- c("brown", "yellow", "violet", "orange", "red", "blue", "green4")
+ylabels <- c("Missense_Mutation")
+par(mar=c(5.1, max(4.1,max(nchar(ylabels))/1.8) ,4.1 ,2.1))
+for (i in 1:nrow(variant_data)) {
+  if(variant_data$Var1[i] == "In_Frame_Ins") {
+    variant_data$Color[i] <- "brown"
+  } else if(variant_data$Var1[i] == "In_Frame_Del") {
+    variant_data$Color[i] <- "yellow"
+  } else if(variant_data$Var1[i] == "Frame_Shift_Ins") {
+    variant_data$Color[i] <- "violet"
+  } else if(variant_data$Var1[i] == "Splice_Site") {
+    variant_data$Color[i] <- "orange"
+  } else if(variant_data$Var1[i] == "Nonsense_Mutation") {
+    variant_data$Color[i] <- "red"
+  } else if(variant_data$Var1[i] == "Frame_Shift_Del") {
+    variant_data$Color[i] <- "blue"
+  } else if(variant_data$Var1[i] == "Missense_Mutation") {
+    variant_data$Color[i] <- "green4"
+  }
+}
+barplot(height=variant_data$Freq, names=variant_data$Var1, col=variant_data$Color, horiz=T, las=1, border=NA)
+dev.off()
+
+# Location of mutations
+
+# > min(mut_ATP7A$Start_Position)
+# [1] 77227117
+# > max(mut_ATP7A$End_Position)
+# [1] 77302020
+# > unique(mut_ATP7A$Chromosome)
+# [1] "X"
+# > table(mut_ATP7A$Exon_Number)
+# 
+# . 10/23 11/23 12/23 13/23 14/23 15/23 16/23 17/23 18/23 19/23 20/23 21/23
+# 3     9     4     6     9     3    14     6    14     8     6     4     9
+# 22/23 23/23  3/23  4/23  5/23  6/23  7/23  8/23  9/23
+# 4    15    20    37    17     7    15     3    10
+
+variant_data <- as.data.frame(table(mut_ATP7A$Exon_Number))
+variant_data <- variant_data[order(variant_data$Freq, decreasing = FALSE),]
+
+# Specific color for each bar? Use a well known palette
+f <- paste(outDir, "/SNV_exon_classification_ATP7A.pdf", sep = "")
+pdf(file = f, width = 5, height =  10)
+coul <- rep("grey", nrow(variant_data))
+# ylabels <- c("Missense_Mutation")
+# par(mar=c(5.1, max(4.1,max(nchar(ylabels))/1.8) ,4.1 ,2.1))
+# for (i in 1:nrow(variant_data)) {
+#   if(variant_data$Var1[i] == "In_Frame_Ins") {
+#     variant_data$Color[i] <- "brown"
+#   } else if(variant_data$Var1[i] == "In_Frame_Del") {
+#     variant_data$Color[i] <- "yellow"
+#   } else if(variant_data$Var1[i] == "Frame_Shift_Ins") {
+#     variant_data$Color[i] <- "violet"
+#   } else if(variant_data$Var1[i] == "Splice_Site") {
+#     variant_data$Color[i] <- "orange"
+#   } else if(variant_data$Var1[i] == "Nonsense_Mutation") {
+#     variant_data$Color[i] <- "red"
+#   } else if(variant_data$Var1[i] == "Frame_Shift_Del") {
+#     variant_data$Color[i] <- "blue"
+#   } else if(variant_data$Var1[i] == "Missense_Mutation") {
+#     variant_data$Color[i] <- "green4"
+#   }
+# }
+barplot(height=variant_data$Freq, names=variant_data$Var1, col=variant_data$Color, horiz=T, las=1, border=NA,
+        xlab = "Mutation count", ylab = "Exon number")
+dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#================================================================
+#================================================================
+# (30) CNV & methylation
+# run on server
+#================================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Get 30 genes
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+
+geneList30 <- c(geneList18, geneList12)
+paste(geneList30, collapse = ' ')
+# paste(geneList30, collapse = ' ')
+# [1] "CDK1 AP1S1 CASP3 TMPRSS6 GSK3B APP COX17 XIAP ARF1 GPC1 SORD ATP7A SP1 MT-CO1 SLC11A2 ATP6AP1 ADAM10 CP MAP1LC3A SNCA MAPT JUN CYP1A1 AOC3 PRNP DBH S100A12 AQP1 MT1X XAF1"
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#================================================================
+
+#================================================================
+# (31) LGG
+# Compare gene expression, copper genes, up genes and down genes, using count and cpm
+# heatmap for clustered groups
+# identify subset of genes for tumour classification & survival analysis
+# run on server
+#================================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# LGG
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+cancertype <- "LGG"
+dat <- surdata[which(surdata$cancertype == cancertype),]
+nrow(dat)
+dat[1:3,1:4]
+# [1] 348
+# cancertype OS OS.time  AANAT
+# TCGA.CS.4938.01        LGG  0    3574 3.3219
+# TCGA.CS.4941.01        LGG  1     234 4.7549
+# TCGA.CS.4942.01        LGG  1    1335 3.5850
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y[1:4,1:5]
+# gene frequency ACC  AML BLCA
+# 1  CDK1        18  UP   UP   UP
+# 2   ALB        13   0 DOWN    0
+# 3 AP1S1        11   0 DOWN    0
+# 4 CASP3         9   0    0    0
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] %in% c("UP", "DOWN")),]$gene
+upGeneList
+downGeneList
+geneList
+# [1] "CDK1"  "CASP3" "XIAP"  "TP53"  "F5"    "ATP7A" "SP1"   "CP"
+# [1] "ALB"      "MAP1LC3A" "SNCA"     "CYP1A1"   "MT-CO1"
+# [1] "CDK1"     "ALB"      "CASP3"    "MAP1LC3A" "SNCA"     "CYP1A1"
+# [7] "XIAP"     "TP53"     "F5"       "ATP7A"    "SP1"      "MT-CO1"
+# [13] "CP"
+
+#------------------------------------
+# For 3 groups
+# select a set of genes which have the same pattern
+# e.g., 5 genes while 3 genes high and 2 genes low in a set of samples,
+# and 3 genes low and 2 genes high in another set
+#------------------------------------
+# For 13 genes, identify 2 groups up & down, LGG
+# Top5, including both up and down
+
+# Get genes with high node degree
+critical_nodes <- read.csv(paste(rootDir, "/Data/LGG/critical_nodes.csv", sep = ""))
+copper.critical<- critical_nodes[critical_nodes$Name %in% geneList, ]
+copper.critical <- copper.critical[order(copper.critical$K, decreasing = TRUE),]
+top5 <- copper.critical[1:5,]
+top5
+# Name   K Kin Kout TypeI TypeII
+# 143  CDK1 180 148   32     0      1
+# 445  TP53 151   5  146     0      1
+# 109 CASP3  66  25   41     0      1
+# 81    ALB  47  18   29     0      1
+# 130  SNCA  34  15   19     0      1
+# up: CDK1, TP53, CASP3, 
+# down: ALB, SNCA
+
+surdata <- dat
+
+# for all 13 genes
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% geneList]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# ALB  ATP7A   CASP3    CDK1      CP
+# TCGA.CS.4938.01 5.4263 8.4838 10.3608  6.3923 11.5159
+# TCGA.CS.4941.01 5.7808 9.1396 10.8556  9.0084 10.2872
+# TCGA.CS.4942.01 4.0875 9.3772 10.6027  8.9425 10.1364
+# TCGA.CS.4943.01 3.8074 9.5018 10.4798 12.3250  8.8437
+# [1] 348
+# [1] 13
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean13 <- colMeans(exp_data)
+
+result_list <- list()
+list_name <- c(1:13)
+for (i in 1:13) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean13[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean13[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+gene_set <- top5$Name
+# > gene_set
+# [1] "CDK1"  "TP53"  "CASP3" "ALB"   "SNCA"
+# > colnames(exp_data)
+# [1] "ALB"      "ATP7A"    "CASP3"    "CDK1"     "CP"       "CYP1A1"
+# [7] "F5"       "MAP1LC3A" "MT-CO1"   "SNCA"     "SP1"      "TP53"
+# [13] "XIAP"
+# > result_list[[4]]$gene
+# [1] "CDK1"
+# up: CDK1, TP53, CASP3, 
+# down: ALB, SNCA
+# 3 up genes & 2 down genes
+res_high <- result_list[[4]]$high # index 4 for CDK1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) { # only for top 3
+    if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) { # 3 up genes
+      res_high <- intersect(res_high, result_list[[i]]$high)  
+    } else { # 2 down genes
+      res_high <- intersect(res_high, result_list[[i]]$low)
+    }
+    print(length(res_high))
+  }
+}
+# [1] 54
+# [1] 54
+# [1] 51
+
+# "CDK1", "TP53", "CASP3" low
+# > result_list[[4]]$gene
+# [1] "CDK1"
+res_low <- result_list[[4]]$low # index 4 for CDK1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) {
+    if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) {
+      res_low <- intersect(res_low, result_list[[i]]$low)  
+    } else {
+      res_low <- intersect(res_low, result_list[[i]]$high)
+    }
+    
+    print(length(res_low))
+  }
+}
+# [1] 237
+# [1] 237
+# [1] 203
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 3 genes high
+nrow(surdata[which(surdata$group == 2),]) # 3 genes low
+nrow(surdata[which(surdata$group == 3),]) # others
+# [1] 51
+# [1] 203
+# [1] 94
+
+#------------------------------------
+# 3 groups
+# surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/LGG_sur_chart_3up_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# heatmap
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+x <- surdata
+x <- x[,which(colnames(x) %in% y$gene)]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% c("CDK1", "TP53", "CASP3")),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+ncol(r1)
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r2) - ncol(r1)
+# r3 <- cbind(r2, rr[,which(!(colnames(rr) %in% c(res_high,res_low)))])
+# ncol(r3) - ncol(r2)
+# r2 <- r3
+# [1] 51
+# [1] 203
+
+# draw the chart
+f <- paste(outDir, "/LGG_heatmap_3up_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 3))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 51), rep(2,203))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+#================================================================
+# (32) Triple negative breast cancer (TNBC)
+# Compare gene expression, copper genes, up genes and down genes, using count and cpm
+# heatmap for clustered groups
+# identify subset of genes for tumour classification & survival analysis
+# run on server
+#================================================================
+
+# Get only triple negative breast cancer (i.e., Basal)
+
+# Get cancer sub types
+subtypes <- c("BRCA")
+all <- PanCancerAtlas_subtypes()
+PAN.path.subtypes <- all[which(all$cancer.type %in% subtypes),]
+PAN.path.subtypes[1:5,1:6]
+nrow(PAN.path.subtypes)
+# # A tibble: 5 × 6
+# pan.samplesID                cancer.type Subtype_mRNA Subtyp…¹ Subty…² Subty…³
+# <chr>                        <chr>       <chr>        <chr>      <int> <chr>
+#   1 TCGA-E2-A158-11A-22R-A12D-07 BRCA        Normal       NA            NA NA
+# 2 TCGA-BH-A0DD-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 3 TCGA-BH-A1EO-11A-31R-A137-07 BRCA        LumA         NA            NA NA
+# 4 TCGA-BH-A0B5-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 5 TCGA-A7-A13G-11A-51R-A13Q-07 BRCA        LumA         NA            NA NA
+# # … with abbreviated variable names ¹​Subtype_DNAmeth, ²​Subtype_protein,
+# #   ³​Subtype_miRNA
+# [1] 1218
+PAN.subtypes <- PAN.path.subtypes
+i <- sapply(PAN.subtypes, is.factor)
+PAN.subtypes[i] <- lapply(PAN.subtypes[i], as.character)
+table(PAN.subtypes$Subtype_mRNA)
+# Basal   Her2   LumA   LumB Normal
+# 193     82    581    219    143
+
+PAN.subtypes <- as.data.frame(PAN.subtypes)
+PAN.subtypes$pan.samplesID <- substr(PAN.subtypes$pan.samplesID, 1, 15)
+PAN.subtypes[1:5,1:6]
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA-E2-A158-11        BRCA       Normal            <NA>              NA
+# 2 TCGA-BH-A0DD-11        BRCA         LumA            <NA>              NA
+# 3 TCGA-BH-A1EO-11        BRCA         LumA            <NA>              NA
+# 4 TCGA-BH-A0B5-11        BRCA         LumA            <NA>              NA
+# 5 TCGA-A7-A13G-11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+PAN.subtypes$pan.samplesID <- str_replace_all(PAN.subtypes$pan.samplesID, "-", ".")
+PAN.subtypes[1:5,1:6]
+nrow(PAN.subtypes)
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA.E2.A158.11        BRCA       Normal            <NA>              NA
+# 2 TCGA.BH.A0DD.11        BRCA         LumA            <NA>              NA
+# 3 TCGA.BH.A1EO.11        BRCA         LumA            <NA>              NA
+# 4 TCGA.BH.A0B5.11        BRCA         LumA            <NA>              NA
+# 5 TCGA.A7.A13G.11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+#   [1] 1218
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# TNBC
+
+type <- "Basal"
+patients <- PAN.subtypes[which(PAN.subtypes$Subtype_mRNA == type),1]
+length(patients)
+# [1] 193
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+dat <- surdata[which(rownames(surdata) %in% patients),]
+nrow(dat)
+dat[1:3,1:4]
+# [1] 191
+# cancertype OS OS.time  AANAT
+# TCGA.A1.A0SK.01       BRCA  1     967 1.5850
+# TCGA.A1.A0SO.01       BRCA  0     852 2.3219
+# TCGA.A1.A0SP.01       BRCA  0     584 1.0000
+
+cancertype <- "BRCA"
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y[1:4,1:5]
+# gene frequency ACC  AML BLCA
+# 1  CDK1        18  UP   UP   UP
+# 2   ALB        13   0 DOWN    0
+# 3 AP1S1        11   0 DOWN    0
+# 4 CASP3         9   0    0    0
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] %in% c("UP", "DOWN")),]$gene
+upGeneList
+downGeneList
+geneList
+# [1] "CDK1"  "CASP3" "GSK3B" "XIAP"  "ARF1"  "SORD"
+# [1] "ALB"      "MAP1LC3A" "SNCA"     "JUN"      "FOXO1"    "AOC3"     "S100A12"
+# [1] "CDK1"     "ALB"      "CASP3"    "MAP1LC3A" "SNCA"     "GSK3B"
+# [7] "JUN"      "XIAP"     "FOXO1"    "ARF1"     "AOC3"     "SORD"
+# [13] "S100A12"
+
+#------------------------------------
+# For 3 groups
+# select a set of genes which have the same pattern
+# e.g., 5 genes while 3 genes high and 2 genes low in a set of samples,
+# and 3 genes low and 2 genes high in another set
+#------------------------------------
+# For 13 genes, identify 2 groups up & down, TNBC
+# Top3, including both up and down
+
+# Get genes with high node degree
+critical_nodes <- read.csv(paste(rootDir, "/Data/BRCA/critical_nodes.csv", sep = ""))
+copper.critical<- critical_nodes[critical_nodes$Name %in% geneList, ]
+copper.critical <- copper.critical[order(copper.critical$K, decreasing = TRUE),]
+top3 <- copper.critical[1:3,]
+top3
+# Name   K Kin Kout TypeI TypeII
+# 131  CDK1 222 180   42     0      1
+# 7     ALB  73  28   45     0      1
+# 68  CASP3  67  29   38     0      1
+# up: CDK1, CASP3
+# down: ALB
+
+surdata <- dat
+
+# for all 13 genes
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% geneList]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# ALB    AOC3    ARF1   CASP3    CDK1
+# TCGA.A1.A0SK.01 11.0341  8.9769 14.1411 11.2691 13.3570
+# TCGA.A1.A0SO.01  6.9773  9.7558 15.3215 10.8001 11.8665
+# TCGA.A1.A0SP.01  6.0444 10.3196 14.9893 11.6874 11.4067
+# TCGA.A2.A04P.01  5.8329 10.5743 15.3696  9.9469 11.5324
+# [1] 191
+# [1] 13
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean13 <- colMeans(exp_data)
+
+result_list <- list()
+list_name <- c(1:13)
+for (i in 1:13) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean13[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean13[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+gene_set <- top3$Name
+# > gene_set
+# [1] "CDK1"  "ALB"   "CASP3"
+# > colnames(exp_data)
+# [1] "ALB"      "AOC3"     "ARF1"     "CASP3"    "CDK1"     "FOXO1"
+# [7] "GSK3B"    "JUN"      "MAP1LC3A" "S100A12"  "SNCA"     "SORD"
+# [13] "XIAP"
+# > result_list[[4]]$gene
+# [1] "CASP3"
+# up: CDK1, CASP3
+# down: ALB
+# 2 up genes & 1 down genes
+res_high <- result_list[[4]]$high # index 4 for CASP3
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% top3$Name) { # only for top 3
+    if(result_list[[i]]$gene %in% c("CDK1", "CASP3")) { # 2 up genes
+      res_high <- intersect(res_high, result_list[[i]]$high)  
+    } else { # 1 down genes
+      res_high <- intersect(res_high, result_list[[i]]$low)
+    }
+    print(length(res_high))
+  }
+}
+# [1] 68
+# [1] 68
+# [1] 36
+
+# 2 low & 1 high
+# > result_list[[4]]$gene
+# [1] "CASP3"
+res_low <- result_list[[4]]$low # index 4 for CASP3
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% top3$Name) {
+    if(result_list[[i]]$gene %in% c("CDK1", "CASP3")) {
+      res_low <- intersect(res_low, result_list[[i]]$low)  
+    } else {
+      res_low <- intersect(res_low, result_list[[i]]$high)
+    }
+    
+    print(length(res_low))
+  }
+}
+# [1] 10
+# [1] 10
+# [1] 9
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 2 genes high & 1 low
+nrow(surdata[which(surdata$group == 2),]) # 2 genes low & 1 high
+nrow(surdata[which(surdata$group == 3),]) # others
+# [1] 36
+# [1] 9
+# [1] 146
+
+#------------------------------------
+# 3 groups
+# surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/TNBC_sur_chart_2up1down_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# heatmap
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+x <- surdata
+x <- x[,which(colnames(x) %in% geneList)]
+x <- x[which(rownames(x) %in% patients),]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+# > dat[1:3,1:4]
+# TCGA.OR.A5J1.01 TCGA.OR.A5J2.01 TCGA.OR.A5J3.01 TCGA.OR.A5J5.01
+# AANAT         7.000219           1.000          4.0000        7.000219
+# ADAM10     3600.046934        6566.915       1924.9430      946.986468
+# ADAM17      532.633736        1998.497        630.5644      301.873436
+# > logCPM[1:3,1:4]
+# TCGA.OR.A5J1.01 TCGA.OR.A5J2.01 TCGA.OR.A5J3.01 TCGA.OR.A5J5.01
+# AANAT         1.256488       0.3668683        1.413222       0.9366785
+# ADAM10        9.469919      10.8315745        9.635874       6.9427818
+# ADAM17        6.724929       9.1171051        8.029537       5.3185282
+# dat <- x_count
+# logCPM <- t(cpm(dat, prior.count=2, log=TRUE))
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00 # scale column (gene)
+# > logCPM[1:4,1:5]
+# TCGA.OR.A5J1.01 TCGA.OR.A5J2.01 TCGA.OR.A5J3.01 TCGA.OR.A5J5.01
+# AANAT       -0.7507425      -1.4941859      -0.6197619      -1.0180031
+# ADAM10      -1.9156365      -0.8455182      -1.7852130      -3.9017003
+# ADAM17      -2.0350440      -0.5656860      -1.2337084      -2.8989047
+# ALB         -0.9006157      -0.5285294      -0.4871709       0.2612733
+# TCGA.OR.A5J6.01
+# AANAT       -0.5880477
+# ADAM10      -1.3724846
+# ADAM17      -1.1933036
+# ALB         -0.6570130
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% top3$Name),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+ncol(r1)
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r2) - ncol(r1)
+# r3 <- cbind(r2, rr[,which(!(colnames(rr) %in% c(res_high,res_low)))])
+# ncol(r3) - ncol(r2)
+# r2 <- r3
+# [1] 36
+# [1] 9
+
+# draw the chart
+f <- paste(outDir, "/TNBC_heatmap_2up1down_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 3))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 36), rep(2,9))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+#================================================================
+# (33) Analyse the effects of cuproplasia-related genes in BRCA on survival for breast cancer subtypes
+# Univariate Cox Analysis
+# TNBC
+#================================================================
+
+# Get only triple negative breast cancer (i.e., Basal)
+
+# Get cancer sub types
+subtypes <- c("BRCA")
+all <- PanCancerAtlas_subtypes()
+PAN.path.subtypes <- all[which(all$cancer.type %in% subtypes),]
+PAN.path.subtypes[1:5,1:6]
+nrow(PAN.path.subtypes)
+# # A tibble: 5 × 6
+# pan.samplesID                cancer.type Subtype_mRNA Subtyp…¹ Subty…² Subty…³
+# <chr>                        <chr>       <chr>        <chr>      <int> <chr>
+#   1 TCGA-E2-A158-11A-22R-A12D-07 BRCA        Normal       NA            NA NA
+# 2 TCGA-BH-A0DD-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 3 TCGA-BH-A1EO-11A-31R-A137-07 BRCA        LumA         NA            NA NA
+# 4 TCGA-BH-A0B5-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 5 TCGA-A7-A13G-11A-51R-A13Q-07 BRCA        LumA         NA            NA NA
+# # … with abbreviated variable names ¹​Subtype_DNAmeth, ²​Subtype_protein,
+# #   ³​Subtype_miRNA
+# [1] 1218
+PAN.subtypes <- PAN.path.subtypes
+i <- sapply(PAN.subtypes, is.factor)
+PAN.subtypes[i] <- lapply(PAN.subtypes[i], as.character)
+table(PAN.subtypes$Subtype_mRNA)
+# Basal   Her2   LumA   LumB Normal
+# 193     82    581    219    143
+
+PAN.subtypes <- as.data.frame(PAN.subtypes)
+PAN.subtypes$pan.samplesID <- substr(PAN.subtypes$pan.samplesID, 1, 15)
+PAN.subtypes[1:5,1:6]
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA-E2-A158-11        BRCA       Normal            <NA>              NA
+# 2 TCGA-BH-A0DD-11        BRCA         LumA            <NA>              NA
+# 3 TCGA-BH-A1EO-11        BRCA         LumA            <NA>              NA
+# 4 TCGA-BH-A0B5-11        BRCA         LumA            <NA>              NA
+# 5 TCGA-A7-A13G-11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+PAN.subtypes$pan.samplesID <- str_replace_all(PAN.subtypes$pan.samplesID, "-", ".")
+PAN.subtypes[1:5,1:6]
+nrow(PAN.subtypes)
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA.E2.A158.11        BRCA       Normal            <NA>              NA
+# 2 TCGA.BH.A0DD.11        BRCA         LumA            <NA>              NA
+# 3 TCGA.BH.A1EO.11        BRCA         LumA            <NA>              NA
+# 4 TCGA.BH.A0B5.11        BRCA         LumA            <NA>              NA
+# 5 TCGA.A7.A13G.11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+#   [1] 1218
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# TNBC
+
+type <- "Basal"
+patients <- PAN.subtypes[which(PAN.subtypes$Subtype_mRNA == type),1]
+length(patients)
+# [1] 193
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+dat <- surdata[which(rownames(surdata) %in% patients),]
+nrow(dat)
+dat[1:3,1:4]
+# [1] 191
+# cancertype OS OS.time  AANAT
+# TCGA.A1.A0SK.01       BRCA  1     967 1.5850
+# TCGA.A1.A0SO.01       BRCA  0     852 2.3219
+# TCGA.A1.A0SP.01       BRCA  0     584 1.0000
+
+cancertype <- "BRCA"
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y[1:4,1:5]
+# gene frequency ACC  AML BLCA
+# 1  CDK1        18  UP   UP   UP
+# 2   ALB        13   0 DOWN    0
+# 3 AP1S1        11   0 DOWN    0
+# 4 CASP3         9   0    0    0
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] %in% c("UP", "DOWN")),]$gene
+upGeneList
+downGeneList
+geneList
+# [1] "CDK1"  "CASP3" "GSK3B" "XIAP"  "ARF1"  "SORD"
+# [1] "ALB"      "MAP1LC3A" "SNCA"     "JUN"      "FOXO1"    "AOC3"     "S100A12"
+# [1] "CDK1"     "ALB"      "CASP3"    "MAP1LC3A" "SNCA"     "GSK3B"
+# [7] "JUN"      "XIAP"     "FOXO1"    "ARF1"     "AOC3"     "SORD"
+# [13] "S100A12"
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#-----------------------------------------------------------
+# nrow(dat)
+# dat[1:3,1:4]
+# # [1] 191
+# # cancertype OS OS.time  AANAT
+# # TCGA.A1.A0SK.01       BRCA  1     967 1.5850
+# # TCGA.A1.A0SO.01       BRCA  0     852 2.3219
+# # TCGA.A1.A0SP.01       BRCA  0     584 1.0000
+
+# Univariate COX Analysis
+
+# to check distibution of gene expression (Optional) - they should have a normal distribution
+# check gene MT1X
+#ggplot(coxdata, aes(x = MT1X)) + geom_histogram(color = "black", fill = "white") 
+
+res_mod = ezcox(dat, time = "OS.time", status = "OS", covariates = geneList, global_method = c("likelihood", "wald", "logrank"), return_models = TRUE)
+mds = get_models(res_mod)
+str(mds, max.level = 1)
+show_models(mds)
+
+cox_res <- ezcox(dat, time = "OS.time", status = "OS", covariates = geneList, global_method = c("likelihood", "wald", "logrank"))
+unicox <- cox_res
+unicox[1:5,1:6]
+nrow(unicox)
+ncol(unicox)
+# # A tibble: 5 × 6
+# Variable is_control contrast_level ref_level n_contrast n_ref
+# <chr>    <lgl>      <chr>          <chr>          <int> <int>
+#   1 CDK1     FALSE      CDK1           CDK1             191   191
+# 2 ALB      FALSE      ALB            ALB              191   191
+# 3 CASP3    FALSE      CASP3          CASP3            191   191
+# 4 MAP1LC3A FALSE      MAP1LC3A       MAP1LC3A         191   191
+# 5 SNCA     FALSE      SNCA           SNCA             191   191
+# [1] 13
+# [1] 12
+
+write.csv(unicox,file = paste(outDir, "/", "TNBC_unicox.csv", sep =""),row.names = FALSE)
+
+######Get significant genes#######
+
+unicox_dif <- unicox[which(unicox$global.pval <= 0.05), ]
+nrow(unicox_dif)
+# > nrow(unicox_dif)
+# [1] 0
+
+# > unicox[,c(1,12)]
+# # A tibble: 13 × 2
+# Variable global.pval
+# <chr>          <dbl>
+#   1 CDK1          0.779
+# 2 ALB           0.952
+# 3 CASP3         0.236
+# 4 MAP1LC3A      0.521
+# 5 SNCA          0.97
+# 6 GSK3B         0.418
+# 7 JUN           0.0513
+# 8 XIAP          0.503
+# 9 FOXO1         0.943
+# 10 ARF1          0.513
+# 11 AOC3          0.363
+# 12 SORD          0.825
+# 13 S100A12       0.997
+
+#-----------------------------------------------------------
+
+#================================================================
+
+#================================================================
+# (34) BRCA
+# Compare gene expression, copper genes, up genes and down genes, using count and cpm
+# heatmap for clustered groups
+# identify subset of genes for tumour classification & survival analysis
+# run on server
+#================================================================
+
+# Get cancer sub types
+subtypes <- c("BRCA")
+all <- PanCancerAtlas_subtypes()
+PAN.path.subtypes <- all[which(all$cancer.type %in% subtypes),]
+PAN.path.subtypes[1:5,1:6]
+nrow(PAN.path.subtypes)
+# # A tibble: 5 × 6
+# pan.samplesID                cancer.type Subtype_mRNA Subtyp…¹ Subty…² Subty…³
+# <chr>                        <chr>       <chr>        <chr>      <int> <chr>
+#   1 TCGA-E2-A158-11A-22R-A12D-07 BRCA        Normal       NA            NA NA
+# 2 TCGA-BH-A0DD-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 3 TCGA-BH-A1EO-11A-31R-A137-07 BRCA        LumA         NA            NA NA
+# 4 TCGA-BH-A0B5-11A-23R-A12P-07 BRCA        LumA         NA            NA NA
+# 5 TCGA-A7-A13G-11A-51R-A13Q-07 BRCA        LumA         NA            NA NA
+# # … with abbreviated variable names ¹​Subtype_DNAmeth, ²​Subtype_protein,
+# #   ³​Subtype_miRNA
+# [1] 1218
+PAN.subtypes <- PAN.path.subtypes
+i <- sapply(PAN.subtypes, is.factor)
+PAN.subtypes[i] <- lapply(PAN.subtypes[i], as.character)
+table(PAN.subtypes$Subtype_mRNA)
+# Basal   Her2   LumA   LumB Normal
+# 193     82    581    219    143
+
+PAN.subtypes <- as.data.frame(PAN.subtypes)
+PAN.subtypes$pan.samplesID <- substr(PAN.subtypes$pan.samplesID, 1, 15)
+PAN.subtypes[1:5,1:6]
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA-E2-A158-11        BRCA       Normal            <NA>              NA
+# 2 TCGA-BH-A0DD-11        BRCA         LumA            <NA>              NA
+# 3 TCGA-BH-A1EO-11        BRCA         LumA            <NA>              NA
+# 4 TCGA-BH-A0B5-11        BRCA         LumA            <NA>              NA
+# 5 TCGA-A7-A13G-11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+PAN.subtypes$pan.samplesID <- str_replace_all(PAN.subtypes$pan.samplesID, "-", ".")
+PAN.subtypes[1:5,1:6]
+nrow(PAN.subtypes)
+# pan.samplesID cancer.type Subtype_mRNA Subtype_DNAmeth Subtype_protein
+# 1 TCGA.E2.A158.11        BRCA       Normal            <NA>              NA
+# 2 TCGA.BH.A0DD.11        BRCA         LumA            <NA>              NA
+# 3 TCGA.BH.A1EO.11        BRCA         LumA            <NA>              NA
+# 4 TCGA.BH.A0B5.11        BRCA         LumA            <NA>              NA
+# 5 TCGA.A7.A13G.11        BRCA         LumA            <NA>              NA
+# Subtype_miRNA
+# 1          <NA>
+#   2          <NA>
+#   3          <NA>
+#   4          <NA>
+#   5          <NA>
+#   [1] 1218
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# BRCA
+
+patients <- PAN.subtypes[,1]
+length(patients)
+# [1] 1218
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+dat <- surdata[which(rownames(surdata) %in% patients),]
+nrow(dat)
+dat[1:3,1:4]
+# [1] 1211
+# cancertype OS OS.time AANAT
+# TCGA.3C.AAAU.01       BRCA  0    4047 1.000
+# TCGA.3C.AALI.01       BRCA  0    4005 3.585
+# TCGA.3C.AALJ.01       BRCA  0    1474 2.000
+
+cancertype <- "BRCA"
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y[1:4,1:5]
+# gene frequency ACC  AML BLCA
+# 1  CDK1        18  UP   UP   UP
+# 2   ALB        13   0 DOWN    0
+# 3 AP1S1        11   0 DOWN    0
+# 4 CASP3         9   0    0    0
+# Critical copper genes
+criticalCopperGenes <- y
+upGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'UP'),]$gene
+downGeneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] == 'DOWN'),]$gene
+geneList <- criticalCopperGenes[which(criticalCopperGenes[,cancertype] %in% c("UP", "DOWN")),]$gene
+upGeneList
+downGeneList
+geneList
+# [1] "CDK1"  "CASP3" "GSK3B" "XIAP"  "ARF1"  "SORD"
+# [1] "ALB"      "MAP1LC3A" "SNCA"     "JUN"      "FOXO1"    "AOC3"     "S100A12"
+# [1] "CDK1"     "ALB"      "CASP3"    "MAP1LC3A" "SNCA"     "GSK3B"
+# [7] "JUN"      "XIAP"     "FOXO1"    "ARF1"     "AOC3"     "SORD"
+# [13] "S100A12"
+
+#------------------------------------
+# For 3 groups
+# select a set of genes which have the same pattern
+# e.g., 5 genes while 3 genes high and 2 genes low in a set of samples,
+# and 3 genes low and 2 genes high in another set
+#------------------------------------
+# For 13 genes, identify 2 groups up & down
+# Top3, including both up and down
+
+# Get genes with high node degree
+critical_nodes <- read.csv(paste(rootDir, "/Data/BRCA/critical_nodes.csv", sep = ""))
+copper.critical<- critical_nodes[critical_nodes$Name %in% geneList, ]
+copper.critical <- copper.critical[order(copper.critical$K, decreasing = TRUE),]
+top3 <- copper.critical[1:3,]
+top3
+# Name   K Kin Kout TypeI TypeII
+# 131  CDK1 222 180   42     0      1
+# 7     ALB  73  28   45     0      1
+# 68  CASP3  67  29   38     0      1
+# up: CDK1, CASP3
+# down: ALB
+
+surdata <- dat
+
+# for all 13 genes
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% geneList]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# ALB    AOC3    ARF1   CASP3    CDK1
+# TCGA.3C.AAAU.01 5.5850  9.3187 15.0249 11.0519 11.4221
+# TCGA.3C.AALI.01 5.5236  9.8588 14.4873 11.2621 10.9024
+# TCGA.3C.AALJ.01 3.3219 10.3401 14.4499  9.8765 11.4752
+# TCGA.3C.AALK.01 5.1293 10.1260 15.0125 10.7805 10.5536
+# [1] 1211
+# [1] 13
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean13 <- colMeans(exp_data)
+
+result_list <- list()
+list_name <- c(1:13)
+for (i in 1:13) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean13[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean13[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+gene_set <- top3$Name
+# > gene_set
+# [1] "CDK1"  "ALB"   "CASP3"
+# > colnames(exp_data)
+# [1] "ALB"      "AOC3"     "ARF1"     "CASP3"    "CDK1"     "FOXO1"
+# [7] "GSK3B"    "JUN"      "MAP1LC3A" "S100A12"  "SNCA"     "SORD"
+# [13] "XIAP"
+# > result_list[[4]]$gene
+# [1] "CASP3"
+# up: CDK1, CASP3
+# down: ALB
+# 2 up genes & 1 down genes
+res_high <- result_list[[4]]$high # index 4 for CASP3
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% top3$Name) { # only for top 3
+    if(result_list[[i]]$gene %in% c("CDK1", "CASP3")) { # 2 up genes
+      res_high <- intersect(res_high, result_list[[i]]$high)  
+    } else { # 1 down genes
+      res_high <- intersect(res_high, result_list[[i]]$low)
+    }
+    print(length(res_high))
+  }
+}
+# [1] 494
+# [1] 494
+# [1] 287
+
+# 2 low & 1 high
+# > result_list[[4]]$gene
+# [1] "CASP3"
+res_low <- result_list[[4]]$low # index 4 for CASP3
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% top3$Name) {
+    if(result_list[[i]]$gene %in% c("CDK1", "CASP3")) {
+      res_low <- intersect(res_low, result_list[[i]]$low)  
+    } else {
+      res_low <- intersect(res_low, result_list[[i]]$high)
+    }
+    
+    print(length(res_low))
+  }
+}
+# [1] 91
+# [1] 91
+# [1] 85
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 2 genes high & 1 low
+nrow(surdata[which(surdata$group == 2),]) # 2 genes low & 1 high
+nrow(surdata[which(surdata$group == 3),]) # others
+# [1] 287
+# [1] 85
+# [1] 839
+
+#------------------------------------
+# 3 groups
+# surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/BRCA_sur_chart_2up1down_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# heatmap
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+x <- surdata
+x <- x[,which(colnames(x) %in% geneList)]
+x <- x[which(rownames(x) %in% patients),]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00 # scale column (gene)
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% top3$Name),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+ncol(r1)
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r2) - ncol(r1)
+# r3 <- cbind(r2, rr[,which(!(colnames(rr) %in% c(res_high,res_low)))])
+# ncol(r3) - ncol(r2)
+# r2 <- r3
+# [1] 287
+# [1] 85
+
+# draw the chart
+f <- paste(outDir, "/BRCA_heatmap_2up1down_3groups.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 3))
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 287), rep(2,85))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+
+#================================================================
+# (35) Lollipop
+# run on server & local
+#================================================================
+#&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+# Server
+#-----------------------------------------
+# Evaluate SNVs
+# Remember to remove SNVs with VAF < 0.05
+
+threshold <- 0.05
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Get 30 genes
+
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+
+# 21 up critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList21 <- y[which(y$numUp > y$numDown),]$gene
+
+# 13 down critical copper genes (more than 1 cancer type)
+y <- y[which(y$frequency > 1),]
+geneList13 <- y[which(y$numUp < y$numDown),]$gene
+
+# 35 cox genes
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+head(uni_gene)
+nrow(uni_gene)
+# nrow(uni_gene)
+# x
+# 1     CDK1
+# 2    AP1S1
+# 3    CASP3
+# 4 MAP1LC3A
+# 5     SNCA
+# 6  TMPRSS6
+# [1] 35
+
+# Cox genes
+geneList18 <- geneList21[which(geneList21 %in% uni_gene$x)]
+geneList12 <- geneList13[which(geneList13 %in% uni_gene$x)]
+
+geneList30 <- c(geneList18, geneList12)
+geneList30
+# [1] "CDK1"     "AP1S1"    "CASP3"    "TMPRSS6"  "GSK3B"    "APP"
+# [7] "COX17"    "XIAP"     "ARF1"     "GPC1"     "SORD"     "ATP7A"
+# [13] "SP1"      "MT-CO1"   "SLC11A2"  "ATP6AP1"  "ADAM10"   "CP"
+# [19] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [25] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# get mutation data
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+
+SNV_types <- c("Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del",
+               "Splice_Site", "Frame_Shift_Ins", "In_Frame_Del",
+               "In_Frame_Ins")
+
+# geneList30
+
+# get all mutation info
+n <- length(subtypes)
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  # Read data
+  dat <- as.data.frame(fread(paste0(outDir, "/SNV/", cancertype, "_maf_data.IdTrans.deleterious.csv")))
+  dat <- dat[which(dat$VAF >= threshold),]
+  # Only get necessary data
+  dat <- dat[,c("Hugo_Symbol","Chromosome","Start_Position","End_Position","Strand","Variant_Classification","Variant_Type","Reference_Allele","Tumor_Seq_Allele1","Tumor_Seq_Allele2","HGVSp_Short")]
+  if(nrow(dat) > 0) {
+    dat$CancerType <- cancertype
+    if(i == 1) {
+      res <- dat
+    } else {
+      res <- rbind(res,dat)
+    }  
+  }
+}
+
+# 30 genes
+write.csv(res[which(res$Hugo_Symbol %in% geneList30),], paste0(outDir, "/SNV/SNV30Genes_005_Lollipop.csv"), row.names=FALSE, quote=FALSE)
+
+#&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+# Local
+
+rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+
+# load data
+mutation.csv <- paste0(rootDir, "/Data/SNV/SNV30Genes_005_Lollipop.csv")
+
+# ============================================
+# read in data
+#   "gene.symbol.col"    : column of gene symbol
+#   "variant.class.col"  : column of variant class
+#   "protein.change.col" : colum of protein change column
+# ============================================
+mutation.dat <- readMAF(mutation.csv,
+                        gene.symbol.col = "Hugo_Symbol",
+                        variant.class.col = "Variant_Classification",
+                        protein.change.col = "HGVSp_Short", # "amino_acid_change",
+                        sep = ",")  # column-separator of csv file
+
+# ---------------------------
+# Draw charts
+
+geneSet <- c("ATP7A", "CP", "MAPT", "APP", "TMPRSS6")
+
+i <- 1
+
+curGene <- geneSet[i]
+
+# set up chart options
+plot.options <- g3Lollipop.options(
+  # Chart settings
+  chart.width = 600,
+  chart.type = "pie",
+  chart.margin = list(left = 30, right = 20, top = 20, bottom = 30),
+  chart.background = "white", # "#d3d3d3",
+  transition.time = 300,
+  # Lollipop track settings
+  lollipop.track.height = 200,
+  lollipop.track.background = "white", # "#d3d3d3",
+  lollipop.pop.min.size = 2,
+  lollipop.pop.max.size = 8,
+  lollipop.pop.info.limit = 5.5,
+  lollipop.pop.info.dy = "0.24em",
+  lollipop.pop.info.color = "white",
+  lollipop.line.color = "#a9A9A9",
+  lollipop.line.width = 1,
+  lollipop.circle.color = "#ffdead",
+  lollipop.circle.width = 0.4,
+  lollipop.label.ratio = 2,
+  lollipop.label.min.font.size = 12,
+  lollipop.color.scheme = "dark2",
+  highlight.text.angle = 60,
+  # Domain annotation track settings
+  anno.height = 24,
+  anno.margin = list(top = 0, bottom = 0),
+  anno.background = "white", # "#d3d3d3",
+  anno.bar.fill = "#a9a9a9",
+  anno.bar.margin = list(top = 4, bottom = 4),
+  domain.color.scheme = "pie4",
+  domain.margin = list(top = 2, bottom = 2),
+  domain.text.color = "black",
+  domain.text.font = "11px Serif",
+  # Y-axis label
+  y.axis.label = "# of mutations",
+  axis.label.color = "#303030",
+  axis.label.alignment = "middle",
+  axis.label.font = "12px Serif",
+  axis.label.dy = "-1.5em",
+  y.axis.line.color = "#303030",
+  y.axis.line.width = 0.5,
+  y.axis.line.style = "line",
+  y.max.range.ratio = 1.1,
+  # Chart title settings
+  title.color = "#303030",
+  title.text = paste0(curGene, " gene"),
+  title.font = "bold 12px Serif",
+  title.alignment = "middle",
+  # Chart legend settings
+  legend = TRUE,
+  legend.margin = list(left=20, right = 0, top = 10, bottom = 5),
+  legend.interactive = TRUE,
+  legend.title = "Variant classification",
+  # Brush selection tool
+  brush = TRUE,
+  brush.selection.background = "#F8F8FF",
+  brush.selection.opacity = 0.3,
+  brush.border.color = "#a9a9a9",
+  brush.border.width = 1,
+  brush.handler.color = "#303030",
+  # tooltip and zoom
+  tooltip = TRUE,
+  zoom = TRUE
+)
+
+g3Lollipop(mutation.dat,
+           gene.symbol = curGene,
+           protein.change.col = "HGVSp_Short",
+           btn.style = "blue", # blue-style chart download buttons
+           plot.options = plot.options,
+           output.filename = curGene)
 #================================================================

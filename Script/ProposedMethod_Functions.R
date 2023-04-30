@@ -1440,4 +1440,6 @@ surAnalysis<-function(surdata, geneList, numGroup=2, K=20, alpha=0.5, outFile, w
   dev.off()
   
   print(paste("p_value: ", p_value, sep = ""))
+  
+  return(p_value)
 }
