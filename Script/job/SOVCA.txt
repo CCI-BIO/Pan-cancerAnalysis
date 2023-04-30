@@ -30,8 +30,8 @@ primarySite=""
 bodySite=""
 
 echo "Running"
-Rscript --verbose /srv/scratch/z3538133/002NetworkAnalysis/Script/Smain.R --rootDir=${rootDir} --outDir=${outDir} --controlDir=${controlDir} --cancertype=${cancertype} --primarySite=${primarySite} --bodySite=${bodySite} > Smain.Rout
-Rscript --verbose /srv/scratch/z3538133/002NetworkAnalysis/Script/main02.R --rootDir=${rootDir} --outDir=${outDir} --controlDir=${controlDir} --cancertype=${cancertype} --primarySite=${primarySite} --bodySite=${bodySite} > main02.Rout
+# Rscript --verbose /srv/scratch/z3538133/002NetworkAnalysis/Script/Smain.R --rootDir=${rootDir} --outDir=${outDir} --controlDir=${controlDir} --cancertype=${cancertype} --primarySite=${primarySite} --bodySite=${bodySite} > Smain.Rout
+Rscript --verbose /srv/scratch/z3538133/002NetworkAnalysis/Script/main02NetworkControl.R --rootDir=${rootDir} --outDir=${outDir} --controlDir=${controlDir} --cancertype=${cancertype} --primarySite=${primarySite} --bodySite=${bodySite} > main02NetworkControl.Rout
 
 ### Run
 ### qsub /srv/scratch/z3538133/002NetworkAnalysis/Script/SOVCA.txt
