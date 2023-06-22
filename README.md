@@ -1,4 +1,4 @@
-<bUnravelling cuproplasia pan-cancer signatures and predicting patient outcomes</b>
+<b>Unravelling cuproplasia pan-cancer signatures and predicting patient outcomes</b>
 
 This repository includes the scripts and data of the proposed method.
 
