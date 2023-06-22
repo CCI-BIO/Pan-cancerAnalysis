@@ -18,6 +18,12 @@ library(CancerSubtypes)
 library("SNFtool")
 library(ezcox)
 library(g3viz)
+library(openxlsx)
+library(dplyr)
+library(plyr)
+library(scales)
+library(ComplexHeatmap)
+library(circlize)
 
 library(datasets)
 library(taRifx)
@@ -25,15 +31,11 @@ library(xtable)
 library(UpSetR)
 library(STRINGdb)
 library(writexl)
-library(dplyr)
 library(mygene)
 library(stringr)
 library(reshape)
-library(plyr)
-library(scales)
 library(ggpubr)
 library(gridExtra)
-library(openxlsx)
 library(hrbrthemes)
 library(viridis)
 library(plotly)
@@ -92,55 +94,61 @@ source(paste(rootDir, "/Script/ProposedMethod_Functions.R", sep=""))
 # module load gsl/2.7.1
 # R
 
-# #================================================================
-# # (-2) Table for data
-# #================================================================
-# 
-# subtypes <- PanCancerAtlas_subtypes()
-# subtypes <- unique(subtypes$cancer.type)
-# subtypes
-# # > subtypes
-# # [1] "ACC"  "AML"  "BLCA" "BRCA" "LGG"  "GBM"  "ESCA" "COAD" "STAD" "READ" "HNSC" "KICH" "KIRC" "KIRP" "LIHC" "LUAD" "LUSC" "OVCA" "PCPG" "PRAD" "SKCM"
-# # [22] "THCA" "UCEC" "UCS" 
-# subtypes <- c(subtypes, "PAAD")
-# subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
-# subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
-# subtypes
-# # > subtypes
-# # [1] "ACC"  "AML"  "BLCA" "BRCA" "COAD" "ESCA" "GBM"  "KICH" "KIRC" "KIRP" "LGG"  "LIHC" "LUAD" "LUSC" "OVCA" "PAAD" "PCPG" "PRAD" "SKCM" "STAD" "THCA"
-# # [22] "UCEC" "UCS" 
-# 
-# names <- c("Adrenocortical carcinoma", "Acute myeloid leukemia", "Bladder Urothelial Carcinoma", "Breast invasive carcinoma", "Colon adenocarcinoma", "Esophageal carcinoma",
-#            "Glioblastoma multiforme", "Kidney Chromophobe", "Kidney renal clear cell carcinoma", "Kidney renal papillary cell carcinoma", "Brain Lower Grade Glioma", "Liver hepatocellular carcinoma",
-#            "Lung adenocarcinoma", "Lung squamous cell carcinoma", "Serous ovarian carcinoma", "Pancreatic Cancer", "Pheochromocytoma and Paraganglioma", "Prostate adenocarcinoma",
-#            "Skin Cutaneous Melanoma", "Stomach adenocarcinoma", "Thyroid carcinoma", "Uterine Corpus Endometrial Carcinoma", "Uterine Carcinosarcoma")
-# tumour <- c(76, 172, 144, 1212, 279, 179,
-#             166, 91, 508, 189, 348, 239,
-#             274, 192, 418, 154, 179, 373,
-#             331, 409, 560, 182, 57)
-# normal <- c(126, 444, 9, 178, 307, 652,
-#             105, 28, 28, 28, 105, 110,
-#             288, 288, 88, 167, 126, 100,
-#             811, 174, 279, 78, 78)
-# 
-# n <- length(subtypes)
-# t <- matrix(NA, nrow = n, ncol = 4)
-# colnames(t) <- c('Code of cancer type', 'Cancer type', 'TCGA primary tumor', 'GTEx normal tissue')
-# for (i in 1:n) {
-#   cancertype <- subtypes[i]
-#   t[i,1] <- cancertype
-#   t[i,2] <- names[i]
-#   t[i,3] <- as.numeric(tumour[i])
-#   t[i,4] <- as.numeric(normal[i])
-# }
-# 
+#================================================================
+# (-2) Table for data, local
+#================================================================
+
+rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
+
+subtypes <- PanCancerAtlas_subtypes()
+subtypes <- unique(subtypes$cancer.type)
+subtypes
+# > subtypes
+# [1] "ACC"  "AML"  "BLCA" "BRCA" "LGG"  "GBM"  "ESCA" "COAD" "STAD" "READ" "HNSC" "KICH" "KIRC" "KIRP" "LIHC" "LUAD" "LUSC" "OVCA" "PCPG" "PRAD" "SKCM"
+# [22] "THCA" "UCEC" "UCS"
+subtypes <- c(subtypes, "PAAD")
+subtypes <- subtypes[-which(subtypes %in% c("READ", "HNSC"))]
+subtypes <- subtypes[order(subtypes, decreasing = FALSE)]
+subtypes
+# > subtypes
+# [1] "ACC"  "AML"  "BLCA" "BRCA" "COAD" "ESCA" "GBM"  "KICH" "KIRC" "KIRP" "LGG"  "LIHC" "LUAD" "LUSC" "OVCA" "PAAD" "PCPG" "PRAD" "SKCM" "STAD" "THCA"
+# [22] "UCEC" "UCS"
+
+names <- c("Adrenocortical carcinoma", "Acute myeloid leukemia", "Bladder Urothelial Carcinoma", "Breast invasive carcinoma", "Colon adenocarcinoma", "Esophageal carcinoma",
+           "Glioblastoma multiforme", "Kidney Chromophobe", "Kidney renal clear cell carcinoma", "Kidney renal papillary cell carcinoma", "Brain Lower Grade Glioma", "Liver hepatocellular carcinoma",
+           "Lung adenocarcinoma", "Lung squamous cell carcinoma", "Serous ovarian carcinoma", "Pancreatic Cancer", "Pheochromocytoma and Paraganglioma", "Prostate adenocarcinoma",
+           "Skin Cutaneous Melanoma", "Stomach adenocarcinoma", "Thyroid carcinoma", "Uterine Corpus Endometrial Carcinoma", "Uterine Carcinosarcoma")
+tumour <- c(76, 172, 144, 1212, 279, 179,
+            166, 91, 508, 189, 348, 239,
+            274, 192, 418, 154, 179, 373,
+            331, 409, 560, 182, 57)
+normal <- c(126, 444, 9, 178, 307, 652,
+            105, 28, 28, 28, 105, 110,
+            288, 288, 88, 167, 126, 100,
+            811, 174, 279, 78, 78)
+
+n <- length(subtypes)
+t <- matrix(NA, nrow = n, ncol = 4)
+colnames(t) <- c('Code of cancer type', 'Cancer type', 'TCGA primary tumor', 'GTEx normal tissue')
+for (i in 1:n) {
+  cancertype <- subtypes[i]
+  t[i,1] <- cancertype
+  t[i,2] <- names[i]
+  t[i,3] <- as.numeric(tumour[i])
+  t[i,4] <- as.numeric(normal[i])
+}
+
 # t[,3]<-format(as.numeric(t[,3]),big.mark=",")
 # t[,4]<-format(as.numeric(t[,4]),big.mark=",")
-# 
-# outDir <- paste(rootDir, "/Data/Output/Table", sep = "")
-# write.xlsx(as.data.frame(t), paste(outDir, "/DataTable.xlsx", sep = ""))
-# 
-# #================================================================
+
+t <- as.data.frame(t)
+t[,3] <- as.numeric(t[,3])
+t[,4] <- as.numeric(t[,4])
+
+outDir <- paste(rootDir, "/Data/Output/Table", sep = "")
+write.xlsx(t, paste(outDir, "/DataTable.xlsx", sep = ""))
+
+#================================================================
 
 #================================================================
 # (-1) Latex table for differentially expressed genes
@@ -727,6 +735,7 @@ cat(geneList30, sep = '\n')
 
 # Analyse the results
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Biological process
 GO_process <- read.table(paste(outDir, "/Enrich/GO_Biological_Process_2021_table.txt", sep=""),
                          as.is = TRUE, sep = "\t", header = TRUE, quote="")
@@ -757,6 +766,7 @@ dev.off()
 GO_process[,4] <- gsub("[;]","; ",GO_process[,4])
 print(latex.table.by(GO_process[1:20,], digits = c(0,0,0,-3,0)), include.rownames = FALSE, include.colnames = TRUE, sanitize.text.function = force)
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Molecular function
 GO_process <- read.table(paste(outDir, "/Enrich/GO_Molecular_Function_2021_table.txt", sep=""),
                          as.is = TRUE, sep = "\t", header = TRUE, quote="")
@@ -787,6 +797,7 @@ dev.off()
 GO_process[,4] <- gsub("[;]","; ",GO_process[,4])
 print(latex.table.by(GO_process[1:20,], digits = c(0,0,0,-3,0)), include.rownames = FALSE, include.colnames = TRUE, sanitize.text.function = force)
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # KEGG
 top <- 20
 GO_process <- read.table(paste(outDir, "/Enrich/KEGG_2021_Human_table.txt", sep=""),
@@ -844,6 +855,7 @@ dev.off()
 GO_process[,4] <- gsub("[;]","; ",GO_process[,4])
 print(latex.table.by(GO_process[1:20,], digits = c(0,0,0,-3,0)), include.rownames = FALSE, include.colnames = TRUE, sanitize.text.function = force)
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Reactome
 top <- 20
 GO_process <- read.table(paste(outDir, "/Enrich/Reactome_2022_table.txt", sep=""),
@@ -906,6 +918,149 @@ dev.off()
 # Table
 GO_process[,4] <- gsub("[;]","; ",GO_process[,4])
 print(latex.table.by(GO_process[1:20,], digits = c(0,0,0,-3,0)), include.rownames = FALSE, include.colnames = TRUE, sanitize.text.function = force)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Combine
+
+# Just get terms from file "SelectedEnrichmentTerms.xlsx"
+selectedTerms <- read.xlsx(xlsxFile = paste0(rootDir, "/Data/SelectedEnrichmentTerms.xlsx"), sheet = 1, skipEmptyRows = FALSE, colNames = FALSE)
+
+top <- 20
+
+# GO biological process
+GO_process_p <- read.csv(paste(outDir, "/Enrich/GO_Biological_Process_2021_table_Cutoff.csv", sep=""))
+GO_process_plot <- read.csv(paste(outDir, "/Enrich/GO_Biological_Process_2021_table_Heatmap.csv", sep=""))
+GO_process_plot$FullTerm <- GO_process_p$Term[1:top]
+GO_process_plot$Adjusted.p.value <- GO_process_p$Adjusted.p.value[1:top]
+GO_process_plot$Type <- "GO_PROCESS"
+GO_process_plot <- GO_process_plot[which(GO_process_plot$FullTerm %in% selectedTerms$X1),]
+GO_process_plot <- GO_process_plot %>% dplyr::select(Term, FullTerm, Adjusted.p.value, Type, everything())
+
+# GO molecular function
+GO_molecular_p <- read.csv(paste(outDir, "/Enrich/GO_Molecular_Function_2021_table_Cutoff.csv", sep=""))
+GO_molecular_plot <- read.csv(paste(outDir, "/Enrich/GO_Molecular_Function_2021_table_Heatmap.csv", sep=""))
+GO_molecular_plot$FullTerm <- GO_molecular_p$Term[1:top]
+GO_molecular_plot$Adjusted.p.value <- GO_molecular_p$Adjusted.p.value[1:top]
+GO_molecular_plot$Type <- "GO_MOLECULAR"
+GO_molecular_plot <- GO_molecular_plot[which(GO_molecular_plot$FullTerm %in% selectedTerms$X1),]
+GO_molecular_plot <- GO_molecular_plot %>% dplyr::select(Term, FullTerm, Adjusted.p.value, Type, everything())
+
+# KEGG
+KEGG_p <- read.csv(paste(outDir, "/Enrich/KEGG_2021_Human_table_Cutoff.csv", sep=""))
+KEGG_plot <- read.csv(paste(outDir, "/Enrich/KEGG_2021_Human_table.csv", sep=""))
+KEGG_plot$FullTerm <- KEGG_p$Term[1:top]
+KEGG_plot$Adjusted.p.value <- KEGG_p$Adjusted.p.value[1:top]
+KEGG_plot$Type <- "KEGG"
+KEGG_plot <- KEGG_plot[which(KEGG_plot$FullTerm %in% selectedTerms$X1),]
+KEGG_plot <- KEGG_plot %>% dplyr::select(Term, FullTerm, Adjusted.p.value, Type, everything())
+
+# Reactome
+Reactome_p <- read.csv(paste(outDir, "/Enrich/Reactome_2022_table_Cutoff.csv", sep=""))
+Reactome_plot <- read.csv(paste(outDir, "/Enrich/Reactome_2022_table.csv", sep=""))
+Reactome_plot$FullTerm <- Reactome_p$Term[1:top]
+Reactome_plot$Adjusted.p.value <- Reactome_p$Adjusted.p.value[1:top]
+Reactome_plot$Type <- "REACTOME"
+Reactome_plot <- Reactome_plot[which(Reactome_plot$FullTerm %in% selectedTerms$X1),]
+Reactome_plot <- Reactome_plot %>% dplyr::select(Term, FullTerm, Adjusted.p.value, Type, everything())
+
+# Combine data
+cols <- unique(c(colnames(GO_process_plot), colnames(GO_molecular_plot), colnames(KEGG_plot), colnames(Reactome_plot)))
+# > cols
+# [1] "Term"             "FullTerm"         "Adjusted.p.value" "Type"             "SNCA"             "PRNP"             "APP"              "SLC11A2"         
+# [9] "ATP7A"            "MT1X"             "GSK3B"            "AQP1"             "MAPT"             "ARF1"             "CP"               "ADAM10"          
+# [17] "ATP6AP1"          "TMPRSS6"          "XIAP"             "CASP3"            "COX17"            "CDK1"             "JUN"              "XAF1"            
+# [25] "DBH"              "S100A12"          "AOC3"             "MAP1LC3A"         "SP1"              "GPC1"             "SORD"             "CYP1A1"          
+# [33] "AP1S1"    
+ncol <- length(cols)
+nrow <- nrow(GO_process_plot) + nrow(GO_molecular_plot) + nrow(KEGG_plot) + nrow(Reactome_plot)
+dat <- as.data.frame(matrix(0, ncol = ncol, nrow = nrow))
+colnames(dat) <- cols
+dat[,"Term"] <- c(GO_process_plot$Term, GO_molecular_plot$Term, KEGG_plot$Term, Reactome_plot$Term)
+dat[,"FullTerm"] <- c(GO_process_plot$FullTerm, GO_molecular_plot$FullTerm, KEGG_plot$FullTerm, Reactome_plot$FullTerm)
+dat[,"Adjusted.p.value"] <- c(GO_process_plot$Adjusted.p.value, GO_molecular_plot$Adjusted.p.value,
+                              KEGG_plot$Adjusted.p.value, Reactome_plot$Adjusted.p.value)
+dat[,"Type"] <- c(GO_process_plot$Type, GO_molecular_plot$Type, KEGG_plot$Type, Reactome_plot$Type)
+for (i in 1:nrow) {
+  dat_from <- Reactome_plot
+  if (dat[i,"Type"] == "GO_PROCESS") {
+    dat_from <- GO_process_plot
+  } else if (dat[i,"Type"] == "GO_MOLECULAR") {
+    dat_from <- GO_molecular_plot
+  } else if (dat[i,"Type"] == "KEGG") {
+    dat_from <- KEGG_plot
+  }
+  
+  r <- which(dat_from$FullTerm == dat[i,"FullTerm"])
+  
+  for (j in 5:ncol) {
+    if (colnames(dat)[j] %in% colnames(dat_from)) {
+      dat[i,j] <- dat_from[r,colnames(dat)[j]]
+    }
+  }
+}
+
+# Remove genes with all 0
+removedGenes <- names(which(colSums(dat[,5:ncol])==0))
+if (length(removedGenes) > 0) {
+  dat <- dat[,!(names(dat) %in% removedGenes)]
+}
+
+# Set different values for different pathways
+for (i in 1:nrow(dat)) {
+  if (dat[i,4] == "GO_MOLECULAR") {
+    for (j in 5:ncol(dat)) {
+      if(dat[i,j] == 1) {
+        dat[i,j] <- 2
+      }
+    }
+  } else if(dat[i,4] == "KEGG") {
+    for (j in 5:ncol(dat)) {
+      if(dat[i,j] == 1) {
+        dat[i,j] <- 3
+      }
+    }
+  } else if(dat[i,4] == "REACTOME") {
+    for (j in 5:ncol(dat)) {
+      if(dat[i,j] == 1) {
+        dat[i,j] <- 4
+      }
+    }
+  }
+}
+
+# # Output
+# # Image
+# f <- paste(outDir, "/Enrich/enrichment.pdf", sep = "")
+# pdf(file = f,  width = 12, height = 8, onefile=FALSE)
+# l <- dat$FullTerm
+# drawClustergram3(dat, "", l)
+# dev.off()
+
+# Use complexheatmap
+f <- paste(outDir, "/Enrich/enrichment.pdf", sep = "")
+pdf(file = f, width = 14, height = 10.5)
+
+dat_heat <- as.matrix(dat[,5:ncol(dat)])
+colors <- structure(c("grey90", 2:4,6), names = c("0", "1", "2", "3", "4"))
+split2 = c(rep(1, nrow(dat[which(dat$Type == "GO_PROCESS"),])), 
+           rep(2, nrow(dat[which(dat$Type == "GO_MOLECULAR"),])),
+           rep(3, nrow(dat[which(dat$Type == "KEGG"),])),
+           rep(4, nrow(dat[which(dat$Type == "REACTOME"),])))
+va = rowAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(2:4,6)), labels = c("GO biological process", "GO molecular function", "KEGG", "Reactome"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+ha1 = rowAnnotation(foo = anno_text(format(dat[,3], scientific = TRUE, digits = 3), gp = gpar(fontsize = 12)))
+ha2 = rowAnnotation(foo = anno_text(dat[,2], gp = gpar(fontsize = 12)))
+
+Heatmap(dat_heat, col = colors,
+        column_title = "",
+        cluster_rows = FALSE, cluster_columns = FALSE, row_split = split2, left_annotation = va, row_title = NULL,
+        rect_gp = gpar(col = "white", lwd = 1),
+        show_heatmap_legend = FALSE, width = unit(12, "cm"), height = unit(24, "cm")) + ha1 + ha2
+
+dev.off()
 
 #================================================================
 # (7) Compare gene expression, identify critical copper genes up and down
@@ -3600,6 +3755,9 @@ rr <- r[which(row.names(r) %in% geneList18),]
 rr <- rbind(rr,r[which(row.names(r) %in% geneList12),])
 write.csv(rr, paste(outDir, "/rr.csv", sep = ""), row.names=TRUE)
 
+# https://jcoliver.github.io/learn-r/009-expression-heatmaps.html
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # draw the chart
 f <- paste(outDir, "/heatmap18_12.pdf", sep = "")
 pdf(file = f, width = 10, height =  10)
@@ -3610,7 +3768,47 @@ my_group2 <- c(rep(1, 23), rep(2,23))
 colSide <- brewer.pal(3, "Set2")[my_group2]
 # colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
 # heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
-heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+# heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10),
+#         col= colorRampPalette(brewer.pal(8, "Oranges"))(25))
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10),
+        col= hcl.colors(12, "YlOrRd", rev = TRUE))
+
+# heatmap(as.matrix(dataSet[, -1]), Colv = NA, Rowv = NA,
+#         scale="column", xlab="something", ylab="", main="A title",
+#         labRow=dataSet$labels, labCol=colnames(dataSet[, -1]),
+#         col= colorRampPalette(brewer.pal(8, "Oranges"))(25))
+
+# legend(x="bottomright", legend=c("min", "ave", "max"),
+#        fill=colorRampPalette(brewer.pal(8, "Oranges"))(3))
+
+legend(x="right", legend=c(paste0("min: ", round(min(data), 2)), paste0("max: ", round(max(data),2))),
+       fill=hcl.colors(2, "YlOrRd", rev = TRUE))
+
+dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# draw the chart using ComplexHeatmap https://jokergoo.github.io/ComplexHeatmap-reference/book/
+
+f <- paste(outDir, "/complexheatmap18_12.pdf", sep = "")
+pdf(file = f, width = 10, height =  10)
+data <- as.matrix(rr)
+data <- apply(data, 2, rev)
+
+split = rep(1:2, each = 23)
+ha = HeatmapAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("GTEx normal tissue", "TCGA primary tumour"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+split2 = c(rep(1, 12), rep(2, 18))
+va = rowAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(3,6)), labels = c("12 down expressed genes", "18 up expressed genes"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+        column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE))
+
 dev.off()
 #-----------------------------------------
 
@@ -4598,21 +4796,49 @@ nNormal <- nrow(my_data[which(my_data$Type == "Normal"),])
 tmp <- rr
 rr <- tmp[,(nTumour+1):(nTumour + nNormal)]
 rr <- cbind(rr, tmp[,1:nTumour])
-# draw
+
+# # draw
+# f <- paste(outDir, "/", cancertype, "_heatmapAll.pdf", sep = "")
+# pdf(file = f, width = 10, height =  10)
+# data <- as.matrix(rr)
+# my_group <- c(rep(1, length(upGeneList)), rep(2,length(downGeneList)))
+# # my_group <- c(rep(1, 18))
+# rowSide <- brewer.pal(3, "Set1")[my_group]
+# my_group2 <- c(rep(1, nNormal), rep(2,nTumour))
+# # my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
+# #                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
+# colSide <- brewer.pal(3, "Set2")[my_group2]
+# # colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# # heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+# heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+# dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# draw the chart using ComplexHeatmap https://jokergoo.github.io/ComplexHeatmap-reference/book/
+
 f <- paste(outDir, "/", cancertype, "_heatmapAll.pdf", sep = "")
-pdf(file = f, width = 10, height =  10)
+pdf(file = f, width = 6, height =  6)
 data <- as.matrix(rr)
-my_group <- c(rep(1, length(upGeneList)), rep(2,length(downGeneList)))
-# my_group <- c(rep(1, 18))
-rowSide <- brewer.pal(3, "Set1")[my_group]
-my_group2 <- c(rep(1, nNormal), rep(2,nTumour))
-# my_group2 <- c(rep(1, nrow(new_dat[which(new_dat$group == 1),])),
-#                rep(2, nrow(new_dat[which(new_dat$group == 2),])))
-colSide <- brewer.pal(3, "Set2")[my_group2]
-# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
-# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
-heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+data <- apply(data, 2, rev)
+
+split = c(rep(1, nNormal), rep(2,nTumour))
+ha = HeatmapAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Normal", "Tumour"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+split2 = c(rep(1, length(downGeneList)), rep(2,length(upGeneList)))
+va = rowAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(3, 6)), labels = c("5 down genes", "8 up genes"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+        column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+        show_column_names = FALSE)
+
 dev.off()
+#-----------------------------------------
 #---------------------------------------
 
 #---------------------------------------
@@ -5770,7 +5996,8 @@ ncol(rr)
 write.csv(rr, paste(outDir, "/rr_heatmap_pan_groups.csv", sep = ""), row.names=TRUE)
 
 #---------------------------------------
-# For 18 genes, for 2 groups, pan-cancer
+# (A) For 18 genes, for 2 groups, pan-cancer, using Euclidean distance
+#---------------------------------------
 
 outDir <- paste(rootDir, "/Data/Output", sep = "")
 load(paste(outDir, "/sur18.Rdata", sep = "")) # return result1
@@ -5904,7 +6131,8 @@ dev.off()
 #-----------------------------------------
 
 #---------------------------------------
-# For 12 genes, for 2 groups, pan-cancer
+# (B) For 12 genes, for 2 groups, pan-cancer, using Euclidean distance
+#---------------------------------------
 
 outDir <- paste(rootDir, "/Data/Output", sep = "")
 
@@ -6026,7 +6254,7 @@ dev.off()
 
 #---------------------------------------
 #------------------------------------
-# For 2 groups only
+# (C) For 2 groups only, pan-cancer, 5 genes
 #------------------------------------
 # For 30 genes, identify 2 groups up & down, pan-cancer
 # Top5, including both up and down
@@ -6306,7 +6534,7 @@ dev.off()
 #------------------------------------
 
 #------------------------------------
-# For 3 groups
+# (D) For 3 groups, 5 genes, pan-cancer
 #------------------------------------
 # For 30 genes, identify 2 groups up & down, pan-cancer
 # Top5, including both up and down
@@ -6543,7 +6771,8 @@ heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide
 dev.off()
 
 #----------------------------
-# check cancer types
+# (E) check cancer types
+#----------------------------
 # group 1
 g1 <- surdata[which(row.names(surdata) %in% res_high),]
 nrow(g1)
@@ -6583,7 +6812,7 @@ table(g3$cancertype)
 #------------------------------------
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #------------------------------------
-# 3 up
+# (F) 3 up, pan-cancer, 3 genes
 #------------------------------------
 # the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
 outDir <- paste(rootDir, "/Data/Output", sep = "")
@@ -6813,7 +7042,7 @@ dev.off()
 #------------------------------------
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #------------------------------------
-# 2 down
+# (G) 2 down, pan-cancer, 2 genes
 #------------------------------------
 # the cases of 30 genes, including 18 genes and 12 genes, for down genes in 12 genes
 outDir <- paste(rootDir, "/Data/Output", sep = "")
@@ -7040,6 +7269,2650 @@ colSide <- brewer.pal(3, "Set2")[my_group2]
 heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
 dev.off()
 #-----------------------------------------
+
+#------------------------------------
+# (H) pan-cancer, 18 up genes, use mean
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_up$gene
+gene_set
+# result_list[[3]]$gene
+# gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+
+# Only use the top 9 genes
+gene_set <- gene_set[1:9]
+# > gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+idx <- findIdx("CDK1")
+
+# all genes up
+# Number of patients with high exp in CDK1
+res_high <- result_list[[idx]]$high
+length(res_high)
+# [1] 2086
+for (i in 2:length(gene_set)) {
+  idx <- findIdx(gene_set[i])
+  res_high <- intersect(res_high, result_list[[idx]]$high)  
+  print(length(res_high))
+}
+# [1] 1342
+# [1] 1177
+# [1] 123
+# [1] 100
+# [1] 69
+# [1] 65
+# [1] 62
+# [1] 60
+# [1] 36
+# [1] 18
+# [1] 14
+# [1] 14
+# [1] 0
+# [1] 0
+# [1] 0
+# [1] 0
+# [1] 0
+
+# genes low
+# Number of patients with low exp in CDK1
+idx <- findIdx("CDK1")
+res_low <- result_list[[idx]]$low
+length(res_low)
+# [1] 4641
+for (i in 2:length(gene_set)) {
+  idx <- findIdx(gene_set[i])
+  res_low <- intersect(res_low, result_list[[idx]]$low)  
+  print(length(res_low))
+}
+# [1] 3700
+# [1] 3296
+# [1] 2832
+# [1] 2482
+# [1] 1976
+# [1] 1768
+# [1] 1700
+# [1] 1664
+# [1] 1558
+# [1] 1427
+# [1] 1363
+# [1] 1267
+# [1] 38
+# [1] 35
+# [1] 31
+# [1] 26
+# [1] 24
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) 
+nrow(surdata[which(surdata$group == 2),]) 
+
+# surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+# *****************************************************
+#   Survival analysis  (Number of clusters =  3 ) Call:
+#   survdiff(formula = Surv(time, status) ~ group)
+# 
+# n=6678, 49 observations deleted due to missingness.
+# 
+# N Observed Expected (O-E)^2/E (O-E)^2/V
+# group=1   59        7     18.7   7.35700     7.429
+# group=2 1651      518    508.8   0.16771     0.223
+# group=3 4968     1547   1544.5   0.00406     0.016
+# 
+# Chisq= 7.5  on 2 degrees of freedom, p= 0.02
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/sur_chart_9genes.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# heatmap
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% gene_set),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r1)
+ncol(r2) - ncol(r1)
+# [1] 60
+# [1] 1664
+
+# draw the chart
+f <- paste(outDir, "/heatmap_9 genes.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 9)) # number of genes
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 60), rep(2,1664))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#------------------------------------
+
+#------------------------------------
+# (I) pan-cancer, 18 up genes, use first quartile
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+# mean30 <- colMeans(exp_data)
+# # > mean30
+# # ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# # 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# # CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# # 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# # SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# # 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499  
+
+# get first quantile
+thres30 <- c(rep(0, 30))
+for (i in 1:30) {
+  thres30[i] <- quantile(exp_data[,i], 0.25)
+}
+thres30
+# thres30
+# [1] 3.159120e+03 3.012368e+02 1.297292e+03 2.501631e+04 2.315645e+03
+# [6] 1.453946e+04 6.093934e+03 4.972339e+02 8.086888e+02 2.475083e+02
+# [11] 8.188692e+02 9.468009e+01 1.587247e+00 5.244263e+00 1.533124e+03
+# [16] 2.095497e+03 4.745095e+03 4.412964e+02 7.121755e+01 7.015338e+05
+# [21] 5.413618e+02 2.810155e+03 2.522050e+00 1.951472e+03 7.269206e+01
+# [26] 1.306693e+03 3.493936e+03 5.808591e+00 4.970430e+02 1.836048e+03
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= thres30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < thres30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_up$gene
+gene_set
+# result_list[[3]]$gene
+# gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+
+# Only use the top 13 genes
+gene_set <- gene_set[1:13]
+# > gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+idx <- findIdx("CDK1")
+
+# all genes up
+# Number of patients with high exp in CDK1
+res_high <- result_list[[idx]]$high
+length(res_high)
+# [1] 5045
+for (i in 2:length(gene_set)) {
+  idx <- findIdx(gene_set[i])
+  res_high <- intersect(res_high, result_list[[idx]]$high)  
+  print(length(res_high))
+}
+# [1] 4195
+# [1] 3922
+# [1] 3398
+# [1] 3197
+# [1] 2956
+# [1] 2807
+# [1] 2735
+# [1] 2717
+# [1] 2523
+# [1] 2329
+# [1] 2245
+# [1] 2218
+# [1] 1108
+# [1] 1080
+# [1] 1070
+# [1] 1045
+# [1] 856
+
+# genes low
+# Number of patients with low exp in CDK1
+idx <- findIdx("CDK1")
+res_low <- result_list[[idx]]$low
+length(res_low)
+# [1] 1682
+for (i in 2:length(gene_set)) {
+  idx <- findIdx(gene_set[i])
+  res_low <- intersect(res_low, result_list[[idx]]$low)  
+  print(length(res_low))
+}
+# [1] 832
+# [1] 734
+# [1] 415
+# [1] 367
+# [1] 217
+# [1] 158
+# [1] 157
+# [1] 154
+# [1] 127
+# [1] 105
+# [1] 94
+# [1] 88
+# [1] 0
+# [1] 0
+# [1] 0
+# [1] 0
+# [1] 0
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) 
+nrow(surdata[which(surdata$group == 2),]) 
+
+# surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+# *****************************************************
+#   Survival analysis  (Number of clusters =  3 ) Call:
+#   survdiff(formula = Surv(time, status) ~ group)
+# 
+# n=6678, 49 observations deleted due to missingness.
+# 
+# N Observed Expected (O-E)^2/E (O-E)^2/V
+# group=1   59        7     18.7   7.35700     7.429
+# group=2 1651      518    508.8   0.16771     0.223
+# group=3 4968     1547   1544.5   0.00406     0.016
+# 
+# Chisq= 7.5  on 2 degrees of freedom, p= 0.02
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/sur_chart_9genes_use1quantile.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# heatmap
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# > surdata[1:5,1:4]
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# > nrow(surdata)
+# [1] 6727
+# > ncol(surdata)
+# [1] 60
+
+x <- surdata
+x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% gene_set),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r1)
+ncol(r2) - ncol(r1)
+# [1] 2218
+# [1] 88
+
+# draw the chart
+f <- paste(outDir, "/heatmap_9genes_use1quantile.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+data <- as.matrix(r2)
+my_group <- c(rep(1, 13)) # number of genes
+rowSide <- brewer.pal(3, "Set1")[my_group]
+#my_group2 <- c(rep(1, 489), rep(2,390))
+my_group2 <- c(rep(1, 2218), rep(2,88))
+colSide <- brewer.pal(3, "Set2")[my_group2]
+# colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+dev.off()
+#------------------------------------
+
+#------------------------------------
+# (J) pan-cancer, 18 up genes, use mean, 3 genes to 9 genes
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_up$gene
+gene_set
+gene_set_full <- gene_set
+# result_list[[3]]$gene
+# gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, outDir, l){
+  # tumour classification & survival analysis
+  surdata$group <- 2
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 1
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),]) 
+  
+  # surdata <- surdata[which(surdata$group %in% c(1,2)),]
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    cat("                                                     \n")
+    cat("*****************************************************\n")
+    cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  f <- paste(outDir, "/sur_chart_", l, "genes_2groups.pdf", sep = "")
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+       main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+         lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+         seg.len = 0.3))
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_high)]
+  # r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+  r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/heatmap_", l, "genes_2groups.pdf", sep = "")
+  pdf(file = f, width = 9, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+          column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+          show_column_names = FALSE))
+  
+  dev.off()
+}
+
+for (l in 3:9) {
+  
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("CDK1", result_list)
+  
+  # all genes up
+  # Number of patients with high exp in CDK1
+  res_high <- result_list[[idx]]$high
+  length(res_high)
+  # [1] 2086
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    res_high <- intersect(res_high, result_list[[idx]]$high)  
+    print(length(res_high))
+  }
+  
+  drawSur(surdata, res_high, outDir, l)
+  
+  drawHeat(gene_set, res_high, geneList18, geneList12, outDir, l)
+}
+
+#------------------------------------
+
+#------------------------------------
+# (K) pan-cancer, 12 down genes, use mean, 2 groups, all low and all high
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for down genes in 12 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_down$gene
+gene_set
+gene_set_full <- gene_set
+# > gene_set_full
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# find index of MAP1LC3A
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, res_low, outDir, l){
+  # tumour classification & survival analysis
+  surdata$group <- 3
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_low) {
+      surdata$group[i] <- 1
+    } else if (row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 2
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),]) 
+  
+  surdata <- surdata[which(surdata$group %in% c(1,2)),]
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  dir.create(file.path(outDir, "SurChart_2groups_high_low_12genes"), showWarnings = FALSE)
+  f <- paste(outDir, "/SurChart_2groups_high_low_12genes/sur_chart_", l, "genes_2groups_down.pdf", sep = "")
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+             main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+               lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+               seg.len = 0.3))
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, res_low, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_low)]
+  r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_high)])
+  # r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/SurChart_2groups_high_low_12genes/heatmap_", l, "genes_2groups_down.pdf", sep = "")
+  pdf(file = f, width = 9, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+                column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+                show_column_names = FALSE))
+  
+  dev.off()
+}
+
+for (l in 2:4) {
+  
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("MAP1LC3A", result_list)
+  
+  # all genes down
+  # Number of patients with low exp in MAP1LC3A
+  res_low <- result_list[[idx]]$low
+  length(res_low)
+  res_high <- result_list[[idx]]$high
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    res_low <- intersect(res_low, result_list[[idx]]$low)  
+    res_high <- intersect(res_high, result_list[[idx]]$high)
+  }
+  
+  drawSur(surdata, res_high, res_low, outDir, l)
+  
+  drawHeat(gene_set, res_high, res_low, geneList18, geneList12, outDir, l)
+}
+
+# l <- 12
+#   
+# # Only use the top genes
+# gene_set <- gene_set_full[1:l]
+# 
+# idx <- findIdx("MAP1LC3A", result_list)
+# 
+# # all genes down
+# # Number of patients with low exp in MAP1LC3A
+# res_low <- result_list[[idx]]$low
+# print(paste0("1 gene, all low: ", length(res_low), " patients"))
+# res_high <- result_list[[idx]]$high
+# print(paste0("1 gene, all high: ", length(res_high), " patients"))
+# for (i in 2:length(gene_set)) {
+#   idx <- findIdx(gene_set[i], result_list)
+#   res_low <- intersect(res_low, result_list[[idx]]$low)  
+#   print(paste0(i, " genes, all low: ", length(res_low), " patients"))
+#   res_high <- intersect(res_high, result_list[[idx]]$high)
+#   print(paste0(i, " genes, all high: ", length(res_high), " patients"))
+# }
+
+#------------------------------------
+
+#------------------------------------
+# (L) pan-cancer, 18 up genes, use mean, 3 genes to 9 genes, high & low
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_up$gene
+gene_set
+gene_set_full <- gene_set
+# result_list[[3]]$gene
+# gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, res_low, outDir, l){
+  # tumour classification & survival analysis
+  surdata$group <- 3
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 1
+    } else if(row.names(surdata)[i] %in% res_low) {
+      surdata$group[i] <- 2
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),]) 
+  
+  surdata <- surdata[which(surdata$group %in% c(1,2)),]
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  dir.create(file.path(outDir, "SurChart_2groups_high_low"), showWarnings = FALSE)
+  f <- paste(outDir, "/SurChart_2groups_high_low/sur_chart_", l, "genes_2groups_high_low.pdf", sep = "")
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+             main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+               lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+               seg.len = 0.3))
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, res_low, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_high)]
+  r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+  # r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/SurChart_2groups_high_low/heatmap_", l, "genes_2groups_high_low.pdf", sep = "")
+  pdf(file = f, width = 9, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+                column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+                show_column_names = FALSE))
+  
+  dev.off()
+}
+
+for (l in 3:9) {
+  
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("CDK1", result_list)
+  
+  # all genes up
+  # Number of patients with high exp in CDK1
+  res_high <- result_list[[idx]]$high
+  length(res_high)
+  # [1] 2086
+  # Number of patients with low exp in CDK1
+  res_low <- result_list[[idx]]$low
+  length(res_low)
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    res_high <- intersect(res_high, result_list[[idx]]$high)  
+    res_low <- intersect(res_low, result_list[[idx]]$low)
+    # print(length(res_high))
+  }
+  
+  drawSur(surdata, res_high, res_low, outDir, l)
+  
+  drawHeat(gene_set, res_high, res_low, geneList18, geneList12, outDir, l)
+}
+
+# l <- 9
+# # Only use the top genes
+# gene_set <- gene_set_full[1:l]
+# 
+# idx <- findIdx("CDK1", result_list)
+# 
+# # all genes up
+# # Number of patients with high exp in CDK1
+# res_high <- result_list[[idx]]$high
+# print(paste0("1 gene, high: ", length(res_high), " patients"))
+# # [1] 2086
+# # Number of patients with low exp in CDK1
+# res_low <- result_list[[idx]]$low
+# print(paste0("1 gene, low: ", length(res_low), " patients"))
+# for (i in 2:length(gene_set)) {
+#   idx <- findIdx(gene_set[i], result_list)
+#   res_high <- intersect(res_high, result_list[[idx]]$high)  
+#   res_low <- intersect(res_low, result_list[[idx]]$low)
+#   # print(length(res_high))
+#   print(paste0(i, " genes, high: ", length(res_high), " patients"))
+#   print(paste0(i, " genes, low: ", length(res_low), " patients"))
+# }
+
+#------------------------------------
+
+#------------------------------------
+# (M) pan-cancer, 30 genes, use mean, high & low
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= mean30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < mean30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+y_plus <- y_plus[which(y_plus$UpDown %in% c("Up", "Down")),]
+y_plus <- y_plus[order(y_plus$frequency, decreasing = TRUE),]
+y_plus$gene
+# y_plus$gene
+# [1] "CDK1"     "AP1S1"    "CASP3"    "MAP1LC3A" "SNCA"     "TMPRSS6"
+# [7] "MAPT"     "GSK3B"    "JUN"      "APP"      "CYP1A1"   "COX17"
+# [13] "XIAP"     "ARF1"     "GPC1"     "AOC3"     "SORD"     "PRNP"
+# [19] "ATP7A"    "SP1"      "MT-CO1"   "DBH"      "SLC11A2"  "S100A12"
+# [25] "ATP6AP1"  "ADAM10"   "CP"       "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus$gene
+gene_set
+gene_set_full <- gene_set
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, res_low, outDir, l){
+  # tumour classification & survival analysis
+  surdata$group <- 3
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 1
+    } else if(row.names(surdata)[i] %in% res_low) {
+      surdata$group[i] <- 2
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),]) 
+  
+  surdata <- surdata[which(surdata$group %in% c(1,2)),]
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  dir.create(file.path(outDir, "SurChart_30genes"), showWarnings = FALSE)
+  f <- paste(outDir, "/SurChart_30genes/sur_chart_", l, "genes_2groups_high_low.pdf", sep = "")
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+             main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+               lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+               seg.len = 0.3))
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, res_low, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_high)]
+  r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+  # r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/SurChart_30genes/heatmap_", l, "genes_2groups_high_low.pdf", sep = "")
+  pdf(file = f, width = 9, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+                column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+                show_column_names = FALSE))
+  
+  dev.off()
+}
+
+for (l in 3:6) {
+  
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("CDK1", result_list)
+  
+  # all genes up
+  # Number of patients with high exp in CDK1
+  res_high <- result_list[[idx]]$high
+  length(res_high)
+  # [1] 2086
+  # Number of patients with low exp in CDK1
+  res_low <- result_list[[idx]]$low
+  length(res_low)
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    if(gene_set[i] %in% y_plus_up$gene) {
+      res_high <- intersect(res_high, result_list[[idx]]$high)  
+      res_low <- intersect(res_low, result_list[[idx]]$low)
+      # print(length(res_high))  
+    } else if(gene_set[i] %in% y_plus_down$gene) {
+      res_high <- intersect(res_high, result_list[[idx]]$low)  
+      res_low <- intersect(res_low, result_list[[idx]]$high)
+      # print(length(res_high))
+    }
+    
+  }
+  
+  drawSur(surdata, res_high, res_low, outDir, l)
+  
+  drawHeat(gene_set, res_high, res_low, geneList18, geneList12, outDir, l)
+}
+
+# l <- 7
+#   
+# # Only use the top genes
+# gene_set <- gene_set_full[1:l]
+# 
+# idx <- findIdx("CDK1", result_list)
+# 
+# # all genes up
+# # Number of patients with high exp in CDK1
+# res_high <- result_list[[idx]]$high
+# length(res_high)
+# # [1] 2086
+# # Number of patients with low exp in CDK1
+# res_low <- result_list[[idx]]$low
+# length(res_low)
+# print(paste0("1 gene: high & low: ", length(res_high), " patients"))
+# print(paste0("1 gene: low & high: ", length(res_low), " patients"))
+# for (i in 2:length(gene_set)) {
+#   idx <- findIdx(gene_set[i], result_list)
+#   if(gene_set[i] %in% y_plus_up$gene) {
+#     res_high <- intersect(res_high, result_list[[idx]]$high)  
+#     res_low <- intersect(res_low, result_list[[idx]]$low)
+#     # print(length(res_high))  
+#   } else if(gene_set[i] %in% y_plus_down$gene) {
+#     res_high <- intersect(res_high, result_list[[idx]]$low)  
+#     res_low <- intersect(res_low, result_list[[idx]]$high)
+#     # print(length(res_high))
+#   }
+#   print(paste0(i, " genes: high & low: ", length(res_high), " patients"))
+#   print(paste0(i, " genes: low & high: ", length(res_low), " patients"))
+# }
+
+#------------------------------------
+
+#------------------------------------
+# (N) pan-cancer, 30 genes, use median, high & low
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+# mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499 
+
+# get median
+thres30 <- c(rep(0, 30))
+for (i in 1:30) {
+  thres30[i] <- quantile(exp_data[,i], 0.5)
+}
+thres30
+# thres30
+# [1] 5.817865e+03 9.583842e+02 2.287196e+03 4.847775e+04 5.946282e+03
+# [6] 2.514424e+04 1.070350e+04 9.598002e+02 1.498657e+03 9.262976e+02
+# [11] 1.389579e+03 6.487549e+02 4.383590e+00 1.274319e+01 3.212869e+03
+# [16] 3.452620e+03 9.496019e+03 8.263325e+02 3.342970e+02 7.962263e+05
+# [21] 1.485146e+03 5.559349e+03 6.843048e+00 3.604495e+03 1.839384e+02
+# [26] 2.939530e+03 6.016133e+03 2.077697e+01 1.194131e+03 3.083093e+03
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= thres30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < thres30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+y_plus <- y_plus[which(y_plus$UpDown %in% c("Up", "Down")),]
+y_plus <- y_plus[order(y_plus$frequency, decreasing = TRUE),]
+y_plus$gene
+# y_plus$gene
+# [1] "CDK1"     "AP1S1"    "CASP3"    "MAP1LC3A" "SNCA"     "TMPRSS6"
+# [7] "MAPT"     "GSK3B"    "JUN"      "APP"      "CYP1A1"   "COX17"
+# [13] "XIAP"     "ARF1"     "GPC1"     "AOC3"     "SORD"     "PRNP"
+# [19] "ATP7A"    "SP1"      "MT-CO1"   "DBH"      "SLC11A2"  "S100A12"
+# [25] "ATP6AP1"  "ADAM10"   "CP"       "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus$gene
+gene_set
+gene_set_full <- gene_set
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, res_low, outDir, l, numGroup = 2){
+  # tumour classification & survival analysis
+  surdata$group <- 3
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 1
+    } else if(row.names(surdata)[i] %in% res_low) {
+      surdata$group[i] <- 2
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),])
+  g3 <- nrow(surdata[which(surdata$group == 3),])
+  
+  if(numGroup == 2) {
+    surdata <- surdata[which(surdata$group %in% c(1,2)),]  
+  }
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  dir.create(file.path(outDir, "SurChart_30genes_median"), showWarnings = FALSE)
+  if(numGroup == 2) {
+    f <- paste(outDir, "/SurChart_30genes_median/sur_chart_", l, "genes_2groups_high_low.pdf", sep = "")  
+  } else {
+    f <- paste(outDir, "/SurChart_30genes_median/sur_chart_", l, "genes_3groups_high_low.pdf", sep = "")
+  }
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+             main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  if(numGroup == 2) {
+    print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+                 lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+                 seg.len = 0.3))  
+  } else {
+    print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")"), paste0(" Subtype 3 (n = ", g3, ")")),
+                 lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+                 seg.len = 0.3))
+  }
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, res_low, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_high)]
+  r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+  # r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/SurChart_30genes_median/heatmap_", l, "genes_2groups_high_low.pdf", sep = "")
+  pdf(file = f, width = 7, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+                column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+                show_column_names = FALSE))
+  
+  dev.off()
+}
+
+# for (l in 3:10) {
+for (l in 8:8) {  
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("CDK1", result_list)
+  
+  # all genes up
+  # Number of patients with high exp in CDK1
+  res_high <- result_list[[idx]]$high
+  length(res_high)
+  # [1] 2086
+  # Number of patients with low exp in CDK1
+  res_low <- result_list[[idx]]$low
+  length(res_low)
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    if(gene_set[i] %in% y_plus_up$gene) {
+      res_high <- intersect(res_high, result_list[[idx]]$high)  
+      res_low <- intersect(res_low, result_list[[idx]]$low)
+      # print(length(res_high))  
+    } else if(gene_set[i] %in% y_plus_down$gene) {
+      res_high <- intersect(res_high, result_list[[idx]]$low)  
+      res_low <- intersect(res_low, result_list[[idx]]$high)
+      # print(length(res_high))
+    }
+    
+  }
+  
+  drawSur(surdata, res_high, res_low, outDir, l, numGroup = 3)
+  
+  drawHeat(gene_set, res_high, res_low, geneList18, geneList12, outDir, l)
+}
+
+# l <- 10
+# 
+# # Only use the top genes
+# gene_set <- gene_set_full[1:l]
+# 
+# idx <- findIdx("CDK1", result_list)
+# 
+# # all genes up
+# # Number of patients with high exp in CDK1
+# res_high <- result_list[[idx]]$high
+# length(res_high)
+# # [1] 2086
+# # Number of patients with low exp in CDK1
+# res_low <- result_list[[idx]]$low
+# length(res_low)
+# print(paste0("1 gene: high & low: ", length(res_high), " patients"))
+# print(paste0("1 gene: low & high: ", length(res_low), " patients"))
+# for (i in 2:length(gene_set)) {
+#   idx <- findIdx(gene_set[i], result_list)
+#   if(gene_set[i] %in% y_plus_up$gene) {
+#     res_high <- intersect(res_high, result_list[[idx]]$high)
+#     res_low <- intersect(res_low, result_list[[idx]]$low)
+#     # print(length(res_high))
+#   } else if(gene_set[i] %in% y_plus_down$gene) {
+#     res_high <- intersect(res_high, result_list[[idx]]$low)
+#     res_low <- intersect(res_low, result_list[[idx]]$high)
+#     # print(length(res_high))
+#   }
+#   print(paste0(i, " genes: high & low: ", length(res_high), " patients"))
+#   print(paste0(i, " genes: low & high: ", length(res_low), " patients"))
+# }
+
+#------------------------------------
+
+#------------------------------------
+# (O) pan-cancer, 12 down genes, use median, 2 groups or 3 groups, all low and all high
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for down genes in 12 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+# mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+# get median
+thres30 <- c(rep(0, 30))
+for (i in 1:30) {
+  thres30[i] <- quantile(exp_data[,i], 0.5)
+}
+thres30
+# thres30
+# [1] 5.817865e+03 9.583842e+02 2.287196e+03 4.847775e+04 5.946282e+03
+# [6] 2.514424e+04 1.070350e+04 9.598002e+02 1.498657e+03 9.262976e+02
+# [11] 1.389579e+03 6.487549e+02 4.383590e+00 1.274319e+01 3.212869e+03
+# [16] 3.452620e+03 9.496019e+03 8.263325e+02 3.342970e+02 7.962263e+05
+# [21] 1.485146e+03 5.559349e+03 6.843048e+00 3.604495e+03 1.839384e+02
+# [26] 2.939530e+03 6.016133e+03 2.077697e+01 1.194131e+03 3.083093e+03
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= thres30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < thres30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_down$gene
+gene_set
+gene_set_full <- gene_set
+# > gene_set_full
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# find index of MAP1LC3A
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, res_low, outDir, l, numGroup = 2){
+  # tumour classification & survival analysis
+  surdata$group <- 3
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_low) {
+      surdata$group[i] <- 1
+    } else if (row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 2
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),])
+  g3 <- nrow(surdata[which(surdata$group == 3),])
+  
+  if(numGroup == 2) {
+    surdata <- surdata[which(surdata$group %in% c(1,2)),]  
+  }
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  dir.create(file.path(outDir, "SurChart_12genes_median"), showWarnings = FALSE)
+  if(numGroup == 2) {
+    f <- paste(outDir, "/SurChart_12genes_median/sur_chart_", l, "genes_2groups_down.pdf", sep = "")  
+  } else {
+    f <- paste(outDir, "/SurChart_12genes_median/sur_chart_", l, "genes_3groups_down.pdf", sep = "")
+  }
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+             main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  if(numGroup == 2) {
+    print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+                 lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+                 seg.len = 0.3))  
+  } else {
+    print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")"), paste0(" Subtype 3 (n = ", g3, ")")),
+                 lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+                 seg.len = 0.3))
+  }
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, res_low, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_low)]
+  r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_high)])
+  # r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/SurChart_12genes_median/heatmap_", l, "genes_2groups_down.pdf", sep = "")
+  pdf(file = f, width = 7, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+                column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+                show_column_names = FALSE))
+  
+  dev.off()
+}
+
+# for (l in 3:12) {
+for (l in 3:3) {  
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("MAP1LC3A", result_list)
+  
+  # all genes down
+  # Number of patients with low exp in MAP1LC3A
+  res_low <- result_list[[idx]]$low
+  length(res_low)
+  res_high <- result_list[[idx]]$high
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    res_low <- intersect(res_low, result_list[[idx]]$low)  
+    res_high <- intersect(res_high, result_list[[idx]]$high)
+  }
+  
+  drawSur(surdata, res_high, res_low, outDir, l, numGroup = 3)
+  
+  drawHeat(gene_set, res_high, res_low, geneList18, geneList12, outDir, l)
+}
+# 
+# l <- 12
+# 
+# # Only use the top genes
+# gene_set <- gene_set_full[1:l]
+# 
+# idx <- findIdx("MAP1LC3A", result_list)
+# 
+# # all genes down
+# # Number of patients with low exp in MAP1LC3A
+# res_low <- result_list[[idx]]$low
+# print(paste0("1 gene, all low: ", length(res_low), " patients"))
+# res_high <- result_list[[idx]]$high
+# print(paste0("1 gene, all high: ", length(res_high), " patients"))
+# for (i in 2:length(gene_set)) {
+#   idx <- findIdx(gene_set[i], result_list)
+#   res_low <- intersect(res_low, result_list[[idx]]$low)
+#   print(paste0(i, " genes, all low: ", length(res_low), " patients"))
+#   res_high <- intersect(res_high, result_list[[idx]]$high)
+#   print(paste0(i, " genes, all high: ", length(res_high), " patients"))
+# }
+
+#------------------------------------
+
+#------------------------------------
+# (P) pan-cancer, 18 up genes, use median, high & low
+#------------------------------------
+# the cases of 30 genes, including 18 genes and 12 genes, for up genes in 18 genes
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% c(geneList18, geneList12)]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# > exp_data[1:4,1:5]
+# ADAM10    AOC3   AP1S1     APP    AQP1
+# TCGA.OR.A5J1.01 11.8138  8.0279 10.6627 15.6575 10.6215
+# TCGA.OR.A5J2.01 12.6810 10.3151 12.6517 16.5306 11.4720
+# TCGA.OR.A5J3.01 10.9106  9.2897 13.5362 16.2096  8.7846
+# TCGA.OR.A5J5.01  9.8872  9.0461 11.4528 14.5345  9.1724
+# > nrow(exp_data)
+# [1] 6727
+# > ncol(exp_data)
+# [1] 30
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+# > x_count[1:4,1:5]
+# ADAM10      AOC3     AP1S1      APP      AQP1
+# TCGA.OR.A5J1.01 3600.0469  260.9989  1621.036 51686.50 1575.3973
+# TCGA.OR.A5J2.01 6566.9147 1273.9562  6434.891 94668.71 2840.6394
+# TCGA.OR.A5J3.01 1924.9430  625.8617 11879.611 75783.70  440.9893
+# TCGA.OR.A5J5.01  946.9865  528.6247  2803.085 23731.24  576.9890
+# > nrow(x_count)
+# [1] 6727
+# > ncol(x_count)
+# [1] 30
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+# mean30 <- colMeans(exp_data)
+# > mean30
+# ADAM10        AOC3       AP1S1         APP        AQP1        ARF1     ATP6AP1       ATP7A       CASP3        CDK1       COX17          CP 
+# 7252.3709   2600.3428   3196.4260  59134.3081  16067.4004  30894.1273  13193.3335   1309.5462   2062.9998   2080.0265   1825.1825  10430.6465 
+# CYP1A1         DBH        GPC1       GSK3B         JUN    MAP1LC3A        MAPT      MT-CO1        MT1X        PRNP     S100A12     SLC11A2 
+# 266.7921   4534.4520   6674.0926   4320.8433  14387.6737   1209.0188   3583.1980 775925.9396   3771.6661   8363.3308    103.0065   4360.4695 
+# SNCA        SORD         SP1     TMPRSS6        XAF1        XIAP 
+# 860.8214   7855.0815   7069.0119    702.0836   2211.8583   3753.9499     
+
+# get median
+thres30 <- c(rep(0, 30))
+for (i in 1:30) {
+  thres30[i] <- quantile(exp_data[,i], 0.5)
+}
+thres30
+# thres30
+# [1] 5.817865e+03 9.583842e+02 2.287196e+03 4.847775e+04 5.946282e+03
+# [6] 2.514424e+04 1.070350e+04 9.598002e+02 1.498657e+03 9.262976e+02
+# [11] 1.389579e+03 6.487549e+02 4.383590e+00 1.274319e+01 3.212869e+03
+# [16] 3.452620e+03 9.496019e+03 8.263325e+02 3.342970e+02 7.962263e+05
+# [21] 1.485146e+03 5.559349e+03 6.843048e+00 3.604495e+03 1.839384e+02
+# [26] 2.939530e+03 6.016133e+03 2.077697e+01 1.194131e+03 3.083093e+03
+
+result_list <- list()
+list_name <- c(1:30)
+for (i in 1:30) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= thres30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < thres30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+y <- y[which(y$frequency > 1),]
+y_plus <- y
+y_plus$UpDown <- "Varied"
+y_plus$UpDown <- ifelse(y_plus$numUp > y_plus$numDown, "Up", y_plus$UpDown)
+y_plus$UpDown <- ifelse(y_plus$numUp < y_plus$numDown, "Down", y_plus$UpDown)
+y_plus$percent <- ifelse(y_plus$UpDown == "Up", y_plus$numUp/y_plus$frequency, y_plus$numDown/y_plus$frequency)
+uni_gene <- read.csv(file = paste(outDir, "/prognostic_genes.csv", sep =""))
+y_plus <- y_plus[which(y_plus$gene %in% uni_gene$x),]
+
+y_plus_up <- y_plus[which(y_plus$UpDown == "Up"),]
+y_plus_up <- y_plus_up[order(y_plus_up$frequency, decreasing = TRUE),]
+y_plus_down <- y_plus[which(y_plus$UpDown == "Down"),]
+y_plus_down <- y_plus_down[order(y_plus_down$frequency, decreasing = TRUE),]
+y_plus_up$gene
+y_plus_down$gene
+# > y_plus_up$gene
+# y_plus_down$gene
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+# [1] "MAP1LC3A" "SNCA"     "MAPT"     "JUN"      "CYP1A1"   "AOC3"
+# [7] "PRNP"     "DBH"      "S100A12"  "AQP1"     "MT1X"     "XAF1"
+
+# gene_set <- y_plus[which(y_plus$frequency > 7 & y_plus$UpDown == "Up"),]$gene
+gene_set <- y_plus_up$gene
+gene_set
+gene_set_full <- gene_set
+# result_list[[3]]$gene
+# gene_set
+# [1] "CDK1"    "AP1S1"   "CASP3"   "TMPRSS6" "GSK3B"   "APP"     "COX17"
+# [8] "XIAP"    "ARF1"    "GPC1"    "SORD"    "ATP7A"   "SP1"     "MT-CO1"
+# [15] "SLC11A2" "ATP6AP1" "ADAM10"  "CP"
+
+# find index of CDK1
+# find index of a gene in result_list
+findIdx <- function(gene, result_list){
+  idx <- 0
+  for (i in 1:30) {
+    if(result_list[[i]]$gene == gene) {
+      idx <- i
+    }
+  }
+  
+  return(idx)
+}
+
+drawSur <- function(surdata, res_high, res_low, outDir, l, numGroup = 2){
+  # tumour classification & survival analysis
+  surdata$group <- 3
+  for (i in 1:nrow(surdata)) {
+    if(row.names(surdata)[i] %in% res_high) {
+      surdata$group[i] <- 1
+    } else if(row.names(surdata)[i] %in% res_low) {
+      surdata$group[i] <- 2
+    }
+  }
+  g1 <- nrow(surdata[which(surdata$group == 1),]) 
+  g2 <- nrow(surdata[which(surdata$group == 2),]) 
+  g3 <- nrow(surdata[which(surdata$group == 3),]) 
+  
+  if(numGroup == 2) {
+    surdata <- surdata[which(surdata$group %in% c(1,2)),]  
+  }
+  clusterNum = length(unique(surdata$group))
+  time <- surdata$OS.time
+  status <- surdata$OS
+  group <- surdata$group
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  mainTitle <- "Pan-cancer"
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  # survival chart
+  # draw the chart
+  dir.create(file.path(outDir, "SurChart_18genes_median"), showWarnings = FALSE)
+  if(numGroup == 2) {
+    f <- paste(outDir, "/SurChart_18genes_median/sur_chart_", l, "genes_2groups_high_low.pdf", sep = "")  
+  } else {
+    f <- paste(outDir, "/SurChart_18genes_median/sur_chart_", l, "genes_3groups_high_low.pdf", sep = "")
+  }
+  pdf(file = f, width = 6, height =  6)
+  # myCol <- wes_palette("Zissou1")
+  myCol <- wes_palette("Darjeeling2")
+  
+  # Graph 1
+  mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+  par(mar = mar.default + c(0, 1, 0, 0)) 
+  title=paste(mainTitle, " (", l, " genes)", sep="")
+  print(plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+             main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5))
+  if(numGroup == 2) {
+    print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")")),
+                 lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+                 seg.len = 0.3))  
+  } else {
+    print(legend(x=par("usr")[2]*0.3,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, c(paste0(" Subtype 1 (n = ", g1, ")"), paste0(" Subtype 2 (n = ", g2, ")"), paste0(" Subtype 3 (n = ", g3, ")")),
+                 lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+                 seg.len = 0.3))
+  }
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5))
+  } else {
+    print(text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5))
+  }
+  dev.off()
+}
+
+drawHeat <- function(gene_set, res_high, res_low, geneList18, geneList12, outDir, l) {
+  # heatmap
+  # Using data from surdata
+  # gene data, log count
+  outDir <- paste(rootDir, "/Data/Output", sep = "")
+  fileName<-paste(outDir, "/surdata.Rdata",sep="")
+  load(fileName) # return surdata
+  surdata[1:5,1:4]
+  nrow(surdata)
+  ncol(surdata)
+  
+  x <- surdata
+  x <- x[,which(colnames(x) %in% c(geneList18, geneList12))]
+  
+  # change from log count to count
+  x_count <- 2^x
+  
+  # compute logCPM
+  dat <- t(x_count)
+  logCPM <- cpm(dat, prior.count=2, log=TRUE)
+  logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+  dat <- logCPM
+  
+  rr <- dat
+  rr <- rr[which(row.names(rr) %in% gene_set),]
+  r1 <- rr[,which(colnames(rr) %in% res_high)]
+  r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+  # r2 <- cbind(r1, rr[,which(!(colnames(rr) %in% res_high))])
+  g1 <- ncol(r1)
+  g2 <- ncol(r2) - ncol(r1)
+  
+  # draw heatmap using complexheatmap
+  f <- paste(outDir, "/SurChart_18genes_median/heatmap_", l, "genes_2groups_high_low.pdf", sep = "")
+  pdf(file = f, width = 7, height =  3)
+  data <- as.matrix(r2)
+  data <- apply(data, 2, rev)
+  
+  split = c(rep(1, g1), rep(2, g2))
+  ha = HeatmapAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  split2 = rep(1, l)
+  va = rowAnnotation(
+    empty = anno_empty(border = FALSE),
+    foo = anno_block(gp = gpar(fill = c(3)), labels = c(paste0(l, " genes")),
+                     labels_gp = gpar(col = "white", fontsize = 15))
+  )
+  print(Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+                column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+                show_column_names = FALSE))
+  
+  dev.off()
+}
+
+# for (l in 3:13) {
+for (l in 5:5) {
+  # Only use the top genes
+  gene_set <- gene_set_full[1:l]
+  
+  idx <- findIdx("CDK1", result_list)
+  
+  # all genes up
+  # Number of patients with high exp in CDK1
+  res_high <- result_list[[idx]]$high
+  length(res_high)
+  # Number of patients with low exp in CDK1
+  res_low <- result_list[[idx]]$low
+  length(res_low)
+  for (i in 2:length(gene_set)) {
+    idx <- findIdx(gene_set[i], result_list)
+    res_high <- intersect(res_high, result_list[[idx]]$high)  
+    res_low <- intersect(res_low, result_list[[idx]]$low)
+    # print(length(res_high))
+  }
+  
+  drawSur(surdata, res_high, res_low, outDir, l, numGroup = 3)
+  
+  drawHeat(gene_set, res_high, res_low, geneList18, geneList12, outDir, l)
+}
+
+# l <- 14
+# # Only use the top genes
+# gene_set <- gene_set_full[1:l]
+# 
+# idx <- findIdx("CDK1", result_list)
+# 
+# # all genes up
+# # Number of patients with high exp in CDK1
+# res_high <- result_list[[idx]]$high
+# print(paste0("1 gene, high: ", length(res_high), " patients"))
+# # Number of patients with low exp in CDK1
+# res_low <- result_list[[idx]]$low
+# print(paste0("1 gene, low: ", length(res_low), " patients"))
+# for (i in 2:length(gene_set)) {
+#   idx <- findIdx(gene_set[i], result_list)
+#   res_high <- intersect(res_high, result_list[[idx]]$high)
+#   res_low <- intersect(res_low, result_list[[idx]]$low)
+#   # print(length(res_high))
+#   print(paste0(i, " genes, high: ", length(res_high), " patients"))
+#   print(paste0(i, " genes, low: ", length(res_low), " patients"))
+# }
+
+#------------------------------------
 
 #================================================================
 
@@ -8216,6 +11089,330 @@ colSide <- brewer.pal(3, "Set2")[my_group2]
 # heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
 heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
 dev.off()
+
+#------------------------------------
+# For 2 groups, using median
+# select a set of genes which have the same pattern
+# e.g., 5 genes while 3 genes high and 2 genes low in a set of samples,
+# and 3 genes low and 2 genes high in another set
+#------------------------------------
+# For 13 genes, identify 2 groups up & down, LGG
+# Top5, including both up and down
+
+# Get genes with high node degree
+critical_nodes <- read.csv(paste(rootDir, "/Data/LGG/critical_nodes.csv", sep = ""))
+copper.critical<- critical_nodes[critical_nodes$Name %in% geneList, ]
+copper.critical <- copper.critical[order(copper.critical$K, decreasing = TRUE),]
+top5 <- copper.critical[1:5,]
+top5
+# Name   K Kin Kout TypeI TypeII
+# 143  CDK1 180 148   32     0      1
+# 445  TP53 151   5  146     0      1
+# 109 CASP3  66  25   41     0      1
+# 81    ALB  47  18   29     0      1
+# 130  SNCA  34  15   19     0      1
+# up: CDK1, TP53, CASP3, 
+# down: ALB, SNCA
+
+# Get top Kin
+copper.critical.Kin <- copper.critical[order(copper.critical$Kin, decreasing = TRUE),]
+top5.Kin <- copper.critical.Kin[1:5,]
+top5.Kin
+# Name   K Kin Kout TypeI TypeII
+# 143  CDK1 180 148   32     0      1
+# 109 CASP3  66  25   41     0      1
+# 81    ALB  47  18   29     0      1
+# 38   XIAP  28  18   10     0      1
+# 130  SNCA  34  15   19     0      1
+
+# Get top Kout
+copper.critical.Kout <- copper.critical[order(copper.critical$Kout, decreasing = TRUE),]
+top5.Kout <- copper.critical.Kout[1:5,]
+top5.Kout
+# Name   K Kin Kout TypeI TypeII
+# 445  TP53 151   5  146     0      1
+# 109 CASP3  66  25   41     0      1
+# 143  CDK1 180 148   32     0      1
+# 81    ALB  47  18   29     0      1
+# 408   SP1  29   7   22     0      1
+
+surdata <- dat
+
+# for all 13 genes
+exp_data <- surdata[,-c(1,2,3)]
+exp_data <- exp_data[,colnames(exp_data) %in% geneList]
+exp_data[1:4,1:5]
+nrow(exp_data)
+ncol(exp_data)
+# ALB  ATP7A   CASP3    CDK1      CP
+# TCGA.CS.4938.01 5.4263 8.4838 10.3608  6.3923 11.5159
+# TCGA.CS.4941.01 5.7808 9.1396 10.8556  9.0084 10.2872
+# TCGA.CS.4942.01 4.0875 9.3772 10.6027  8.9425 10.1364
+# TCGA.CS.4943.01 3.8074 9.5018 10.4798 12.3250  8.8437
+# [1] 348
+# [1] 13
+
+x <- exp_data
+
+# change from log count to count
+x_count <- 2^x
+
+# compute CPM
+dat <- t(x_count)
+CPM <- cpm(dat, log=FALSE)
+
+exp_data <- CPM
+exp_data <- t(exp_data)
+# mean13 <- colMeans(exp_data)
+thres30 <- c(rep(0, 13))
+for (i in 1:13) {
+  thres30[i] <- quantile(exp_data[,i], 0.5)
+}
+thres30
+# thres30
+# [1]     35.68476    438.18277   1178.78605    234.48578    468.31344
+# [6]     13.89685    356.51580   1083.97774 982736.93496   1385.39751
+# [11]   3079.76738   2505.99267   3305.76220
+
+result_list <- list()
+list_name <- c(1:13)
+for (i in 1:13) {
+  gene <- colnames(exp_data)[i]
+  high <- rownames(exp_data)[which(exp_data[,i] >= thres30[i])]
+  low <- rownames(exp_data)[which(exp_data[,i] < thres30[i])]
+  result_list[[list_name[i]]] <- list(gene = gene, high = high, low = low)
+}
+
+gene_set <- top5$Name
+# > gene_set
+# [1] "CDK1"  "TP53"  "CASP3" "ALB"   "SNCA"
+# > colnames(exp_data)
+# [1] "ALB"      "ATP7A"    "CASP3"    "CDK1"     "CP"       "CYP1A1"
+# [7] "F5"       "MAP1LC3A" "MT-CO1"   "SNCA"     "SP1"      "TP53"
+# [13] "XIAP"
+# > result_list[[4]]$gene
+# [1] "CDK1"
+# up: CDK1, TP53, CASP3, 
+# down: ALB, SNCA
+# 3 up genes & 2 down genes
+
+# # for top 3 genes based on K
+# res_high <- result_list[[4]]$high # index 4 for CDK1
+# for (i in 1:length(result_list)) {
+#   if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) { # only for top 3
+#     if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) { # 3 up genes
+#       res_high <- intersect(res_high, result_list[[i]]$high)
+#     } else { # 2 down genes
+#       res_high <- intersect(res_high, result_list[[i]]$low)
+#     }
+#     print(length(res_high))
+#   }
+# }
+# # [1] 122
+# # [1] 122
+# # [1] 109
+# 
+# # "CDK1", "TP53", "CASP3" low
+# # > result_list[[4]]$gene
+# # [1] "CDK1"
+# res_low <- result_list[[4]]$low # index 4 for CDK1
+# for (i in 1:length(result_list)) {
+#   if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) {
+#     if(result_list[[i]]$gene %in% c("CDK1", "TP53", "CASP3")) {
+#       res_low <- intersect(res_low, result_list[[i]]$low)  
+#     } else {
+#       res_low <- intersect(res_low, result_list[[i]]$high)
+#     }
+#     
+#     print(length(res_low))
+#   }
+# }
+# # [1] 122
+# # [1] 122
+# # [1] 112
+
+# for top 3 genes based on Kin
+top5.Kin$Name
+# > top5.Kin$Name
+# [1] "CDK1"  "CASP3" "ALB"   "XIAP"  "SNCA"
+# Up: CDK1, CASP3, XIAP
+# Down: ALB, SNCA
+res_high <- result_list[[4]]$high # index 4 for CDK1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% c("CDK1", "CASP3", "ALB")) { # only for top 3
+    if(result_list[[i]]$gene %in% c("CDK1", "CASP3")) { # 2 up genes
+      res_high <- intersect(res_high, result_list[[i]]$high)
+    } else { # 1 down gene
+      res_high <- intersect(res_high, result_list[[i]]$low)
+    }
+    print(length(res_high))
+  }
+}
+# [1] 72
+# [1] 50
+# [1] 50
+
+# for low
+res_low <- result_list[[4]]$low # index 4 for CDK1
+for (i in 1:length(result_list)) {
+  if(result_list[[i]]$gene %in% c("CDK1", "CASP3", "ALB")) {
+    if(result_list[[i]]$gene %in% c("CDK1", "CASP3")) {
+      res_low <- intersect(res_low, result_list[[i]]$low)  
+    } else {
+      res_low <- intersect(res_low, result_list[[i]]$high)
+    }
+    
+    print(length(res_low))
+  }
+}
+# [1] 72
+# [1] 37
+# [1] 37
+
+# tumour classification & survival analysis
+surdata$group <- 3
+for (i in 1:nrow(surdata)) {
+  if(row.names(surdata)[i] %in% res_high) {
+    surdata$group[i] <- 1
+  }
+  if(row.names(surdata)[i] %in% res_low) {
+    surdata$group[i] <- 2
+  }
+}
+nrow(surdata[which(surdata$group == 1),]) # 3 genes high
+nrow(surdata[which(surdata$group == 2),]) # 3 genes low
+nrow(surdata[which(surdata$group == 3),]) # others
+# [1] 50
+# [1] 37
+# [1] 261
+
+#------------------------------------
+# 2 groups
+surdata <- surdata[which(surdata$group %in% c(1,2)),]
+clusterNum = length(unique(surdata$group))
+time <- surdata$OS.time
+status <- surdata$OS
+group <- surdata$group
+dataset = list(time, status, x = group)  
+surv = survfit(Surv(time, status) ~ x, dataset)
+mainTitle <- "Survival analysis"
+if(clusterNum>1){
+  sdf=NULL
+  sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+  cat("                                                     \n")
+  cat("*****************************************************\n")
+  cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+  # print(sdf)
+  p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+}else{
+  cat("There is only one cluster in the group")
+  p_value=1
+}
+
+# survival chart
+# draw the chart
+f <- paste(outDir, "/LGG_sur_chart_2up_1down_2groups_Kin.pdf", sep = "")
+pdf(file = f, width = 6, height =  6)
+# myCol <- wes_palette("Zissou1")
+myCol <- wes_palette("Darjeeling2")
+
+# Graph 1
+mar.default <- c(5,4,4,2) + 0.1 # c(bottom, left, top, right)
+par(mar = mar.default + c(0, 1, 0, 0)) 
+title=paste(mainTitle, " (", clusterNum, " clusters)", sep="")
+plot(surv, lty = 1, col=myCol[2:(clusterNum+1)], lwd=2, xscale=30, xlab="Survival time (Months)", ylab="Survival probability",
+     main = title, font.main=2, cex.lab=1.6, cex.axis=1.5, cex.main=1.7, cex.sub=1.5)
+legend(x=par("usr")[2]*0.6,y=par("usr")[4]*0.95,x.intersp=0.05,y.intersp=1.2, paste(" Subtype", 1:clusterNum),
+       lty=1, lwd=3, cex=1.3, text.font=2, text.col=myCol[2:(clusterNum+1)], bty="n", col=myCol[2:(clusterNum+1)],
+       seg.len = 0.3)
+digit=ceiling(-log10(p_value)+2)
+if (p_value < 2e-16) {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value < 2e-16"),col="blue",font=2,cex=1.5)
+} else {
+  text(x=par("usr")[2]*0.6,y=par("usr")[4]*0.96,paste("p-value =",round(p_value,digit)),col="blue",font=2,cex=1.5)  
+}
+dev.off()
+
+# heatmap
+
+# Using data from surdata
+# gene data, log count
+outDir <- paste(rootDir, "/Data/Output", sep = "")
+fileName<-paste(outDir, "/surdata.Rdata",sep="")
+load(fileName) # return surdata
+surdata[1:5,1:4]
+nrow(surdata)
+ncol(surdata)
+# cancertype OS OS.time  AANAT
+# TCGA.OR.A5J1.01        ACC  1    1355 2.8074
+# TCGA.OR.A5J2.01        ACC  1    1677 0.0000
+# TCGA.OR.A5J3.01        ACC  0    2091 2.0000
+# TCGA.OR.A5J5.01        ACC  1     365 2.8074
+# TCGA.OR.A5J6.01        ACC  0    2703 2.0000
+# [1] 6727
+# [1] 60
+
+fileName<-paste(outDir, "/criticalCopperGenesUpDown.csv",sep="")
+y <- read.csv(fileName)
+x <- surdata
+x <- x[,which(colnames(x) %in% y$gene)]
+
+# change from log count to count
+x_count <- 2^x
+
+# compute logCPM
+dat <- t(x_count)
+logCPM <- cpm(dat, prior.count=2, log=TRUE)
+logCPM <- t(scale(t(logCPM))) # z score, need memory, qsub -I -l select=1:ncpus=2:mem=24gb,walltime=8:00:00
+dat <- logCPM
+
+rr <- dat
+rr <- rr[which(row.names(rr) %in% c("CDK1", "CASP3", "ALB")),]
+r1 <- rr[,which(colnames(rr) %in% res_high)]
+ncol(r1)
+r2 <- cbind(r1, rr[,which(colnames(rr) %in% res_low)])
+ncol(r2) - ncol(r1)
+
+# # draw the chart
+# f <- paste(outDir, "/LGG_heatmap_3up_2groups.pdf", sep = "")
+# pdf(file = f, width = 6, height =  6)
+# data <- as.matrix(r2)
+# my_group <- c(rep(1, 3))
+# rowSide <- brewer.pal(3, "Set1")[my_group] # 3 genes
+# #my_group2 <- c(rep(1, 489), rep(2,390))
+# my_group2 <- c(rep(1, 109), rep(2,112))
+# colSide <- brewer.pal(3, "Set2")[my_group2]
+# # colMain <- colorRampPalette(brewer.pal(8, "Blues"))(25)
+# # heatmap(data, Colv = NA, Rowv = NA, scale="column" , RowSideColors=colSide, col=colMain   )
+# heatmap(data, Colv = NA, Rowv = NA, RowSideColors=rowSide, ColSideColors=colSide , cexRow = 1.5, cexCol = 1.5, margins = c(10, 10))
+# dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# draw the chart using ComplexHeatmap https://jokergoo.github.io/ComplexHeatmap-reference/book/
+
+f <- paste(outDir, "/LGG_heatmap_2up_1down_2groups_Kin.pdf", sep = "")
+pdf(file = f, width = 6, height =  3)
+data <- as.matrix(r2)
+data <- apply(data, 2, rev)
+
+split = c(rep(1, 50), rep(2, 37))
+ha = HeatmapAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(4,2)), labels = c("Subtype 1", "Subtype 2"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+split2 = c(rep(1, 3))
+va = rowAnnotation(
+  empty = anno_empty(border = FALSE),
+  foo = anno_block(gp = gpar(fill = c(3)), labels = c("3 genes"),
+                   labels_gp = gpar(col = "white", fontsize = 15))
+)
+Heatmap(data, name = "Z-Score", column_split = split, row_split = split2, top_annotation = ha, left_annotation = va,
+        column_title = NULL, row_title = NULL, cluster_rows = FALSE, cluster_columns = FALSE, col = hcl.colors(12, "YlOrRd", rev = TRUE),
+        show_column_names = FALSE)
+
+dev.off()
+#-----------------------------------------
 
 #================================================================
 # (32) Triple negative breast cancer (TNBC)
