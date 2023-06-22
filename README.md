@@ -4,8 +4,8 @@ This repository includes the scripts and data of the proposed method.
 
 The scripts are in the Script folder and include:</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(1) ProposedMethod_Functions.R - Developed functions used for our method</br>
-    &nbsp;&nbsp;&nbsp;&nbsp;(2) Smain.R - Main script for the method, differential gene expression analysis and gene regulatory network construction</br>
-    &nbsp;&nbsp;&nbsp;&nbsp;(3) main02.R - Main script for the method, critical node identification and Univariate Cox analysis</br>
+    &nbsp;&nbsp;&nbsp;&nbsp;(2) Smain.R - Main script for the method, including differential gene expression analysis and gene regulatory network construction</br>
+    &nbsp;&nbsp;&nbsp;&nbsp;(3) main02.R - Main script for the method, including critical node identification and Univariate Cox analysis</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(4) main03.R - Risk score model for LGG</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(5) sub.R - Other analyses</br>
     &nbsp;&nbsp;&nbsp;&nbsp;(6) job folder - jobs for HPC
