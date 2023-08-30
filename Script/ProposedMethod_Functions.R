@@ -1022,6 +1022,37 @@ drawClustergram2=function(dat, t, l){
 }
 
 #================================================================
+#' This function allows you to draw a clustergram
+#' @param dat the data to draw.
+#' @param t title
+#' @param l terms
+#================================================================
+drawClustergram3=function(dat, t, l){
+  d <- dat
+  ps <- d$Adjusted.p.value
+  d <- d[,-c(3)]
+  d.m <- melt(d)
+  d.m <- ddply(d.m, .(variable), transform, rescale = rescale(value))
+  d.m$FullTerm <- factor(d.m$FullTerm, levels = rev(l))
+  p <- ggplot(d.m, aes(variable, FullTerm)) + 
+    geom_tile(aes(fill = rescale), colour = "white") + 
+    scale_fill_gradient(low = "#CCCCCC", high = "#E85642")
+  base_size <- 15
+  p + theme_grey(base_size = base_size) + 
+    labs(title= t, y = "", x = "Critical cuproplasia-related gene") + 
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) + 
+    theme(legend.position = "none", axis.ticks = element_blank(), 
+          axis.text.x = element_text(size = base_size*1.2, 
+                                     angle = 90, vjust = 0.5, hjust=1,
+                                     colour = "black"),
+          axis.text.y = element_text(size = base_size*1.2,
+                                     colour = "black"),
+          axis.title = element_text(size=base_size*1.4),
+          plot.title = element_text(size=base_size*1.6))
+}
+
+#================================================================
 #' This function allows you to read results of exploring drivers for cancer subtypes
 #' @param resultDir the directory to get data.
 #' @param type the cancer subtype.
@@ -1389,12 +1420,101 @@ survivalAnalysis2 <- function(mainTitle = "Survival Analysis", time, status, gro
   return(p_value)
 }
 
+formatP <- function(p_value) {
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    p <- paste0("p < 2e-16")
+  } else {
+    p <- paste0("p = ", round(p_value,digit))
+  }
+  
+  return(p)
+}
+
+survivalAnalysis3 <- function(mainTitle = "Survival Analysis", time, status, group, distanceMatrix = NULL, similarity = TRUE, nYears, title){
+  
+  time <- time/30 # change to month
+  group <- ifelse(group == 1, "Subtype 1", "Subtype 2")
+  
+  clusterNum = length(unique(group))
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  if(!is.null(distanceMatrix[1,1])){
+    layout(matrix(c(1,1,2,2), 2, 2, byrow = FALSE), widths=c(2,2), heights=c(2,2))
+  }
+  
+  myCol <- wes_palette("Darjeeling2")
+  
+  # plot
+  # surv = survfit(Surv(time, status) ~ x, dataset)
+  g <- survfit2(Surv(time, status) ~ x, data = dataset) %>%
+    ggsurvfit(
+      theme = list(theme_ggsurvfit_default(),
+                   theme(plot.title = element_text(face = "bold", size = 16),
+                         axis.text = element_text(size = 16),
+                         axis.title = element_text(size = 16),
+                         legend.text = element_text(size = 14),
+                         legend.position = c(.7, .9),
+                         text = element_text(size = 16),
+                         axis.line = element_line(colour = "black"),
+                         panel.grid.major = element_blank(),
+                         panel.grid.minor = element_blank(),
+                         panel.border = element_blank(),
+                         panel.background = element_blank()))
+    ) +
+    labs(
+      x = "Survival time (Months)",
+      y = "Survival probability", 
+      title = title
+    ) + 
+    # add_confidence_interval() +
+    add_risktable(
+      risktable_stats = c("n.risk"),
+      # risktable_height = 0.33,
+      size = 4.5, # increase font size of risk table statistics
+      theme =   # increase font size of risk table title and y-axis label
+        list(
+          theme_risktable_default(axis.text.y.size = 14, plot.title.size = 14),
+          theme(plot.title = element_text(face = "plain"))
+        )
+    ) +
+    # add_risktable_strata_symbol(symbol = "\U25AC", size = 16) +
+    add_pvalue("caption", size = 6, pvalue_fun = formatP, prepend_p = FALSE) + 
+    coord_cartesian(xlim = c(0, 120), ylim = c(0, 1), expand = TRUE) + 
+    scale_x_continuous(breaks = c(0, 30, 60, 90, 120))
+    # scale_x_continuous(limits = c(0, 120), expand = expansion(mult = c(0, .03))) +
+    # scale_y_continuous(limits = c(0, 1), expand = c(0,0))
+  print(g)
+  
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    p <- paste0("p-value < 2e-16")
+  } else {
+    p <- paste0("p-value = ", round(p_value,digit))
+  }  
+  
+  return(p)
+}
+
 constructSimilarityGraph<-function(datasets, clusterNum, K=20, alpha=0.5, plot=TRUE)
 {
   W_temp=list()
   for(i in 1:length(datasets))
   {
-    distance=(dist2(as.matrix(t(datasets[[i]])), as.matrix(t(datasets[[i]]))))
+    distance=CancerSubtypes::dist2(as.matrix(t(datasets[[i]])), as.matrix(t(datasets[[i]])))
     W_temp[[i]] = affinityMatrix(distance, K, alpha)
   }
   # W = SNF(W_temp, K=K, t=t)
@@ -1412,7 +1532,10 @@ constructSimilarityGraph<-function(datasets, clusterNum, K=20, alpha=0.5, plot=T
   result
 }
 
-surAnalysis<-function(surdata, geneList, numGroup=2, K=20, alpha=0.5, outFile, w = 800, h = 600) {
+surAnalysis<-function(surdata, geneList, numGroup=2, K=20, alpha=0.5, outFile, w = 800, h = 600, limit = FALSE, nYears = 10, title = "", full = FALSE) {
+  # ezfun::set_ccf_palette("contrast")
+  ezfun::set_ccf_palette(colors = c("#0000D1", "#32CD32", "#FFC300"))
+  
   dat1=surdata
   dat1 <- dat1[,-c(1,2,3)]
   dat1 <- t(dat1)
@@ -1432,14 +1555,136 @@ surAnalysis<-function(surdata, geneList, numGroup=2, K=20, alpha=0.5, outFile, w
   distanceMatrix1=result1$distanceMatrix
   
   # png(file = outFile, width = w, height = h)
-  pdf(file = outFile, width = w, height = h)
+  pdf(file = outFile, width = w, height = h, onefile=FALSE) # onefile=FALSE: for removing blank page
   t <- "Survival analysis"
-  p_value=survivalAnalysis2(mainTitle=t,surdata$OS.time,
-                           surdata$OS,group1,
-                           distanceMatrix1,similarity=TRUE)
+  if(limit == TRUE) {
+    # only get samples with survival data
+    surdata2 <- surdata
+    surdata2$group <- group1
+    surdata2 <- surdata2[which(!is.na(surdata2$OS)),]
+    surdata2 <- surdata2[which(!is.na(surdata2$OS.time)),]
+    
+    if(full == FALSE) {
+      # Only get samples with time less than 10 years
+      surdata2 <- surdata2[which(surdata2$OS.time <= nYears*12*30),]  
+    }
+    
+    # Analyse
+    p_value=survivalAnalysis3(mainTitle=t,surdata2$OS.time,
+                              surdata2$OS,surdata2$group,
+                              distanceMatrix = NULL,similarity=TRUE, nYears, title)
+  } else {
+    p_value=survivalAnalysis2(mainTitle=t,surdata$OS.time,
+                             surdata$OS,group1,
+                             distanceMatrix1,similarity=TRUE)
+  }
   dev.off()
   
   print(paste("p_value: ", p_value, sep = ""))
   
   return(p_value)
+}
+
+surAnalysisMutant <- function(surdata, outFile, w = 800, h = 600, limit = FALSE, nYears = 10, title = "", full = FALSE) {
+  # ezfun::set_ccf_palette("contrast")
+  ezfun::set_ccf_palette(colors = c("#0000D1", "#32CD32", "#FFC300"))
+  
+  # png(file = outFile, width = w, height = h)
+  pdf(file = outFile, width = w, height = h, onefile=FALSE) # onefile=FALSE: for removing blank page
+  t <- "Survival analysis"
+  if(limit == TRUE) {
+    # only get samples with survival data
+    surdata2 <- surdata
+    surdata2 <- surdata2[which(!is.na(surdata2$OS)),]
+    surdata2 <- surdata2[which(!is.na(surdata2$OS.time)),]
+    
+    if(full == FALSE) {
+      # Only get samples with time less than 10 years
+      surdata2 <- surdata2[which(surdata2$OS.time <= nYears*12*30),]  
+    }
+    
+    # Analyse
+    p_value=survivalAnalysisMutant(mainTitle=t,surdata2$OS.time,
+                              surdata2$OS,surdata2$group, nYears, title)
+  } else {
+    print("Not implemented yet")
+  }
+  dev.off()
+  
+  print(paste("p_value: ", p_value, sep = ""))
+  
+  return(p_value)
+}
+
+survivalAnalysisMutant <- function(mainTitle = "Survival Analysis", time, status, group, nYears, title){
+  
+  time <- time/30 # change to month
+  
+  clusterNum = length(unique(group))
+  dataset = list(time, status, x = group)  
+  surv = survfit(Surv(time, status) ~ x, dataset)
+  if(clusterNum>1){
+    sdf=NULL
+    sdf=survdiff(Surv(time, status) ~ group) ##log-rank test
+    # cat("                                                     \n")
+    # cat("*****************************************************\n")
+    # cat(paste(mainTitle, " (Number of clusters = ", clusterNum, ")", ""))
+    # print(sdf)
+    p_value = 1 - pchisq(sdf$chisq, length(sdf$n) - 1)
+  }else{
+    cat("There is only one cluster in the group")
+    p_value=1
+  }
+  
+  myCol <- wes_palette("Darjeeling2")
+  
+  # plot
+  # surv = survfit(Surv(time, status) ~ x, dataset)
+  g <- survfit2(Surv(time, status) ~ x, data = dataset) %>%
+    ggsurvfit(
+      theme = list(theme_ggsurvfit_default(),
+                   theme(plot.title = element_text(face = "bold", size = 16),
+                         axis.text = element_text(size = 16),
+                         axis.title = element_text(size = 16),
+                         legend.text = element_text(size = 14),
+                         legend.position = c(.7, .9),
+                         text = element_text(size = 16),
+                         axis.line = element_line(colour = "black"),
+                         panel.grid.major = element_blank(),
+                         panel.grid.minor = element_blank(),
+                         panel.border = element_blank(),
+                         panel.background = element_blank()))
+    ) +
+    labs(
+      x = "Survival time (Months)",
+      y = "Survival probability", 
+      title = title
+    ) + 
+    # add_confidence_interval() +
+    add_risktable(
+      risktable_stats = c("n.risk"),
+      # risktable_height = 0.33,
+      size = 4.5, # increase font size of risk table statistics
+      theme =   # increase font size of risk table title and y-axis label
+        list(
+          theme_risktable_default(axis.text.y.size = 14, plot.title.size = 14),
+          theme(plot.title = element_text(face = "plain"))
+        )
+    ) +
+    # add_risktable_strata_symbol(symbol = "\U25AC", size = 16) +
+    add_pvalue("caption", size = 6, pvalue_fun = formatP, prepend_p = FALSE) + 
+    coord_cartesian(xlim = c(0, 120), ylim = c(0, 1), expand = TRUE) + 
+    scale_x_continuous(breaks = c(0, 30, 60, 90, 120))
+  # scale_x_continuous(limits = c(0, 120), expand = expansion(mult = c(0, .03))) +
+  # scale_y_continuous(limits = c(0, 1), expand = c(0,0))
+  print(g)
+  
+  digit=ceiling(-log10(p_value)+2)
+  if (p_value < 2e-16) {
+    p <- paste0("p-value < 2e-16")
+  } else {
+    p <- paste0("p-value = ", round(p_value,digit))
+  }  
+  
+  return(p)
 }

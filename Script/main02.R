@@ -74,9 +74,9 @@ primarySite <- c(opt$primarySite)
 # PAAD
 # dir.create(file.path("C:/Users/vpham/Documents/002NetworkAnalysis/Data", "BRCA"), showWarnings = FALSE)
 # rootDir="C:/Users/vpham/Documents/002NetworkAnalysis" # And put the input files in "rootDir/Data"
-# outDir="C:/Users/vpham/Documents/002NetworkAnalysis/Data/ESCA"
+# outDir="C:/Users/vpham/Documents/002NetworkAnalysis/Data/LGG"
 # controlDir="C:/Users/vpham/Documents/002NetworkAnalysis/control"
-# cancertype="ESCA"
+# cancertype="LGG"
 # primarySite=""
 # # Gadi
 # dir.create(file.path("/scratch/eu82/vp8928/002NetworkAnalysis/Data", "AML"), showWarnings = FALSE)

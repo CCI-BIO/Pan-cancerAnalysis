@@ -426,37 +426,21 @@ Coefficients <- coef(fit, s = cv.fit$lambda.min)
 Active.Index <- which(Coefficients != 0)
 Active.Coefficients <- Coefficients[Active.Index]
 Coefficients
-# 10 x 1 sparse Matrix of class "dgCMatrix"
-# 1
-# ALB    -0.12731255
-# ATP7A   .
-# CASP3   0.25492445
-# CDK1    0.17735078
-# CP      0.15464554
-# CYP1A1 -0.04102212
-# F5      .
-# MT-CO1 -0.03404832
-# SP1     .
-# TP53    .
 
 Active.Index
 Active.Coefficients
-# > Active.Index
-# [1] 1 3 4 5 6 8
-# > Active.Coefficients
-# [1] -0.12731255  0.25492445  0.17735078  0.15464554 -0.04102212 -0.03404832
 
 lasso_gene <- row.names(Coefficients)[Active.Index]
 lasso_min <- data.frame(Active.Index,Active.Coefficients,lasso_gene)
 lasso_min
 # > lasso_min
 # Active.Index Active.Coefficients lasso_gene
-# 1            1         -0.12731255        ALB
-# 2            3          0.25492445      CASP3
-# 3            4          0.17735078       CDK1
-# 4            5          0.15464554         CP
-# 5            6         -0.04102212     CYP1A1
-# 6            8         -0.03404832     MT-CO1
+# 1            1         -0.12157533        ALB
+# 2            3          0.25051154      CASP3
+# 3            4          0.17369917       CDK1
+# 4            5          0.15084949         CP
+# 5            6         -0.03929607     CYP1A1
+# 6            8         -0.03095952     MT-CO1
 
 save(lasso_min,file = paste(outDir, "/", cancertype, "_lasso_min.Rdata", sep = ""))
 save(cv.fit,fit,lasso_gene,file = paste(outDir, "/", cancertype, "_Lasso_model_min.Rdata", sep = ""))
@@ -499,29 +483,10 @@ plot(ROC,time = 365,col = "blue",add = FALSE)
 
 ROC$AUC
 confint(ROC)
-# > ROC$AUC
-# t=365    t=1095    t=1825
-# 0.6690062 0.7245540 0.7504007
-# > confint(ROC)
-# $CI_AUC
-# 2.5% 97.5%
-#   t=365  58.50 75.30
-# t=1095 67.12 77.79
-# t=1825 69.76 80.32
-# 
-# $CB_AUC
-# 2.5% 97.5%
-#   t=365  56.69 77.11
-# t=1095 65.97 78.94
-# t=1825 68.62 81.46
-# 
-# $C.alpha
-# 95%
-# 2.383602
 
 pdf(file = paste(outDir,"/", cancertype, "_Lasso.pdf", sep =""),   # The directory you want to save the file in
     width = 4.5, # The width of the plot in inches
-    height = 3) # The height of the plot in inches
+    height = 6) # The height of the plot in inches
 
 {
   auc_365 = ROC$AUC[[1]]
@@ -539,15 +504,16 @@ pdf(file = paste(outDir,"/", cancertype, "_Lasso.pdf", sep =""),   # The directo
     geom_line(data = dat,aes(x = fpr1095, y = tpr1095),color = "#FFA500")+
     geom_line(data = dat,aes(x = fpr1825, y = tpr1825),color = "#DD1717")+
     geom_line(aes(x=c(0,1),y=c(0,1)),color = "grey")+
-    theme_bw()+
-    annotate("text",x = .625, y = .2, hjust = 0,
-             label = paste("AUC of 1 year: ", round(auc_365,2)), color = "#0066E7")+
-    annotate("text",x = .625, y = .125, hjust = 0,
-             label = paste("AUC of 3 years: ", round(auc_1095,2)), color = "#FFA500")+
-    annotate("text",x = .625, y = .05, hjust = 0,
-             label = paste("AUC of 5 years: ", round(auc_1825,2)), color = "#DD1717")+
+    theme_bw(base_size = 20)+
+    annotate("text",x = .3, y = .2, hjust = 0,
+             label = paste("AUC of 1 year: ", round(auc_365,2)), color = "#0066E7", size = 15/.pt)+
+    annotate("text",x = .3, y = .125, hjust = 0,
+             label = paste("AUC of 3 years: ", round(auc_1095,2)), color = "#FFA500", size = 15/.pt)+
+    annotate("text",x = .3, y = .05, hjust = 0,
+             label = paste("AUC of 5 years: ", round(auc_1825,2)), color = "#DD1717", size = 15/.pt)+
     scale_x_continuous(name = "FPR")+
-    scale_y_continuous(name = "TPR")
+    scale_y_continuous(name = "TPR")+
+    theme(axis.title.y = element_text(size = 20))
 }
 
 dev.off()
