@@ -1,4 +1,4 @@
-<b>Gene regulatory networks identify pan-cancer cuproplasia-related gene signatures to predict patient outcome</b>
+<b>A gene regulatory network identifies a cuproplasia-related gene signature pan-cancer to predict patient outcome</b>
 
 This repository includes the scripts and data of the proposed method.
 
